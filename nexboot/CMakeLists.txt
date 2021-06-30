@@ -10,7 +10,7 @@ project(nexboot VERSION 0.0.1)
 # Set the common arch
 if(ARCH STREQUAL "i686" OR ARCH STREQUAL "x86_64")
     set(COMMONARCH "x86")
-elseif(ARCH STREQUAL "riscv32")
+elseif(ARCH STREQUAL "riscv32" OR ARCH STREQUAL "riscv64")
     set(COMMONARCH "riscv")
 endif()
 

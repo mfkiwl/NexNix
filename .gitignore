@@ -3,3 +3,6 @@ rootdir
 .vscode
 cross
 deps
+*.img
+bochs.txt
+bochs.log

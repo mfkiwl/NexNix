@@ -5,6 +5,11 @@
 # Setup the basics
 cmake_minimum_required(VERSION 3.16)
 set(CMAKE_C_STANDARD 11)
-project(nexboot-pc)
+# Build the MBR first
+project(mbr)
 
+set(CMAKE_C_FLAGS "")
+set(CMAKE_EXE_LINKER_FLAGS "-Ttext=0x600 -Wl,--oformat=binary -nostdlib -fno-pie")
 
+add_executable(mbr boot/mbr.s)
+install(TARGETS mbr DESTINATION usr/bin/../../boot)

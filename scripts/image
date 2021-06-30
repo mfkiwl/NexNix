@@ -45,24 +45,6 @@ sleep 5
 mkfs.ext2 ${loopdev}p1
 sleep 2
 
-# Install Limine
-mkdir fs
-mount ${loopdev}p1 fs
-mkdir fs/boot
-# Install Limine
-rm -rf limine
-git clone https://github.com/limine-bootloader/limine.git --branch=v2.0-branch
-cd limine
-# Build limine
-make
-# Install stage 3
-cp bin/limine.sys ../fs/limine.sys
-cd ..
-cp conf/limine.cfg $PWD/fs/boot/limine.cfg
-
-umount fs
-rm -r fs
-
 # Delete partitions
 losetup -d $loopdev
 
@@ -70,6 +52,5 @@ losetup -d $loopdev
 name=$(logname)
 chown $name $output
 
-# Install limine
-./limine/bin/limine-install $output
-sleep 1
+# Install the bootloader
+./nexboot-install/nexboot-install -i nexware.img -m rootdir/boot/mbr

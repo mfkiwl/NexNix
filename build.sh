@@ -152,7 +152,16 @@ targetprep() {
     then
         cd $tar && rm -rf build-$arch && mkdir build-$arch && cd build-$arch
         cmake .. -DDEBUG:STRING=$debug -DARCH:STRING=$arch -DBOARD:STRING=$board -DCROSS:STRING=$CROSS \
-            -DCMAKE_TOOLCHAIN_FILE:FILEPATH=../../toolchain-gnu.cmake -DCMAKE_INSTALL_PREFIX:STRING=$PWD/$prefix
+            -DCMAKE_TOOLCHAIN_FILE:FILEPATH=$PWD/../toolchain-gnu.cmake -DCMAKE_INSTALL_PREFIX:STRING=$PWD/../../$prefix
+        cd ../..
+        if [ "$board" = "pc" ]
+        then
+            # Build nexboot-install now
+            cd nexboot-install && rm -rf build && mkdir build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX:STRING=$PWD/..
+            make install
+            rmdir ../bin
+        fi
     fi
 }
 
@@ -256,17 +265,17 @@ then
     if [ "$target" = "all" ]
     then
         # Install the headers
-        cp include/* rootdir/usr/include/
+        cp -r include/* rootdir/usr/include/
         # Go through all Nexware projects first
-        for tar in $nextargets
+        for tar in $buildtar
         do
-            cd $tar && rm -rf build-$arch && mkdir build-$arch && cd build-$arch
+            cd $tar/build-$arch
             make install
         done
     # If we want to build a certain target
     else
         # Figure out what type this target is
-        for tar in $nextargets
+        for tar in $buildtar
         do
             if [ "$tar" = "$target" ]
             then
@@ -290,6 +299,13 @@ then
     # Delete all downloaded things
     rm -rf cross
     rm -rf $prefix
+    # Clean up nexboot-install
+    if [ "$board" = "pc" ]
+    then
+        cd nexboot-install
+        rm nexboot-install && rm -r build
+        cd ..
+    fi
     # Now delete the build folders
     for tar in $nextargets
     do
