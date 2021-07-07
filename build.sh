@@ -1,318 +1,166 @@
 #! /bin/sh
-# build.sh - contains main build script
+# build.sh - the top level build system for NexNix
 # Distributed with NexNix, licensed under the MIT license
 # See LICENSE
 
-# Argument variables
-prefix=
-debug=off
-arch=
-board=
-action=build
-target=all
-
-archs="i686-pc x86_64-pc x86_64-efi riscv32-virt riscv64-virt end"
-actions="build prepare clean end"
-targets="all toolchain nexboot end"
-buildtar="nexboot"
-gccver=10.2.0
-binutilver=2.35
-
-# Parses an argument's data
-arghandle()
+# Helper functions
+# Prints out an error message
+panic()
 {
-    # Grab actual argument
-    arg=$(echo "$1" | awk -F "=" '{print $1}')
-    # Now figure out what it is
-    if [ "$arg" = "--help" ]
-    then
-        # Print out help
-        echo "$0 - manages build process for NexNix"
-        echo "Usage: $0 [OPTIONS]"
-        echo "Supported options:"
-        echo "--help\t\t\tprint out this screen"
-        echo "--arch=ARCH\t\tsets what arch is to be used"
-        echo "--archs\t\tprint all available archs"
-        echo "--target=TARGET\t\tsets what target is to be built"
-        echo "--action=ACTION\t\tspecifies what sould be done. Can be build or prepare"
-        echo "--debug\t\t\tif set, nexware will be built in debug mode"
-        echo "--prefix=DIR\t\tsets what directory nexware files should be copied to"
-        exit 0
-    elif [ "$arg" = "--archs" ]
-    then
-        echo "Available archs:"
-        echo "i686-pc x86_64-pc riscv32-virt"
-        echo "Archs are split into 2 parts: the CPU architecture, and the board for that cpu"
-    elif [ "$arg" = "--arch" ]
-    then
-        argdata=$(echo "$1" | awk -F "=" '{print $2}')
-        if [ -z "$argdata" ]
-        then
-            echo "$0: --arch requires an argument"
-            exit 1
-        fi
-        # Validate and parse the arch
-        # Now check if the contents are valid
-        for arch in $archs
-        do
-            if [ "$argdata" = "$arch" ] && [ "$argdata" != "end" ]
-            then
-                break
-            elif [ "$arch" = "end" ]
-            then
-                echo "$0: Invalid arch set"
-                exit 1
-            fi
-        done
-        argarch=$(echo "$argdata" | awk -F "-" '{print $1}')
-        if [ -z "$argarch" ]
-        then
-            echo "$0: arch not set"
-            exit 1
-        fi
-        argboard=$(echo "$argdata" | awk -F "-" '{print $2}')
-        if [ -z "$argboard" ]
-        then
-            echo "$0: board not set"
-            exit 1
-        fi
-        # Set the vars
-        board=$argboard
-        arch=$argarch
-    # If the user specified what to do
-    elif [ "$arg" = "--action" ]
-    then
-        # Get the action wanted
-        argdata=$(echo "$1" | awk -F "=" '{print $2}')
-        if [ -z "$argdata" ]
-        then
-            echo "$0: No action specified"
-            exit 1
-        fi
-        # Loop through the actions
-        for act in $actions
-        do
-            if [ "$argdata" = "$act" ] && [ "$argdata" != "end" ]
-            then
-                break
-            elif [ "$act" = "end" ]
-            then
-                echo "$0: Invalid action set"
-                exit 1
-            fi
-        done
-        action=$argdata
-    # If the user specified what to build
-    elif [ "$arg" = "--target" ]
-    then
-        # Get the target wanted
-        argdata=$(echo "$1" | awk -F "=" '{print $2}')
-        if [ -z "$argdata" ]
-        then
-            echo "$0: No target specified"
-            exit 1
-        fi
-        # Loop through the actions
-        for tar in $targets
-        do
-            if [ "$argdata" = "$tar" ] && [ "$argdata" != "end" ]
-            then
-                break
-            elif [ "$tar" = "end" ]
-            then
-                echo "$0: Invalid target set"
-                exit 1
-            fi
-        done
-        target=$argdata
-    elif [ "$arg" = "--debug" ]
-    then
-        debug=all
-    elif [ "$arg" = "--prefix" ]
-    then
-        # Get the dir wanted
-        argdata=$(echo "$1" | awk -F "=" '{print $2}')
-        if [ -z "$argdata" ]
-        then
-            echo "$0: No prefix specified"
-            exit 1
-        fi
-        prefix=$argdata
-    else
-        echo "$0: Invalid argument sent"
-        exit 1
-    fi
+    name=$(basename "$0")
+    echo "$name: error: $1"
+    exit 1
 }
 
-# Prepares a target
-targetprep() {
-    tar=$1
-    # Figure out what to do
-    if [ "$tar" = "nexboot" ]
-    then
-        cd $tar && rm -rf build-$arch && mkdir build-$arch && cd build-$arch
-        cmake .. -DDEBUG:STRING=$debug -DARCH:STRING=$arch -DBOARD:STRING=$board -DCROSS:STRING=$CROSS \
-            -DCMAKE_TOOLCHAIN_FILE:FILEPATH=$PWD/../toolchain-gnu.cmake -DCMAKE_INSTALL_PREFIX:STRING=$PWD/../../$prefix
-        cd ../..
-        if [ "$board" = "pc" ]
-        then
-            # Build nexboot-install now
-            cd nexboot-install && rm -rf build && mkdir build && cd build
-            cmake .. -DCMAKE_INSTALL_PREFIX:STRING=$PWD/..
-            make install
-            rmdir ../bin
-        fi
-    fi
+# Prints something on screen
+message()
+{
+    name=$(basename "$0")
+    echo "$name: $1"
 }
 
-# Setup vars for argument loop
-args=$@
-# Loop through the arguments
-for arg in $args
-do
-# Parse this argument
-arghandle $arg
-done
-# Make sure required arguments were sent
-# Check prefix
-if [ -z "$prefix" ] && [ "$action" = "prepare" ]
-then
-    echo "$0: Prefix must be set"
-    exit 1
-fi
-# Check arch
-if [ -z "$arch" ] || [ -z "$board" ]
-then
-    echo "$0: Arch must be set"
-    exit 1
-fi
 
-# Parse cpus
-ncpu=1
+help()
+{
+    # Print out help info
+    cat <<end
+$(basename $0) - builds a distribution of NexNix
+$(basename $0) is a powerful script which is used to build the NexNix operating system
+It uses the file conf/nexnix.conf, while contains all configuration data in realtion to NexNix, using an INI like format
+See docs/conf.md for more info on it
+Below are valid options which can be passed to $(basename $0)
+    -h - shows this help screen
+    -A ACTION - tells the scripts what it needs to do. These include:
+        "build" - builds the system and installs in in the prefix directory
+        "clean" - removes all intermediate files / folders
+        "dist" - builds a tarball of the source files
+        "image" - builds the system, and then creates a disk image
+        "dump" - dumps all valid architectures
+    This option is required
+    -j JOBS - specifies how many concurrent jobs to use. If the nproc(1) command is available, then this is the default, else, 1 is the default
+    -i IMAGE - specifies the disk image to output to. Required for action "image", else unused
+    -p PREFIX - specifies directory to install everything into. Required for actions "build" and "image", unused for everything else
+    -a ARCH - specifies the target architecture to build for. Required for actions "build" and "image"
+    -d DISKTYPE - specifies the partition format for the disk. It can be either "mbr" or "gpt". Note that architectural\
+restrictions may constraint this option
+    -D "PARAMS" - contains configuration overrides. This allows for users to override the default configuration in nexnix.conf
+end
+}
+# Main variables
+GLOBAL_ARGS=
+GLOBAL_ACTION=
+GLOBAL_ACTIONS="build clean image dist dump"
+GLOBAL_JOBCOUNT=
+GLOBAL_PREFIX=
+GLOBAL_IMAGE=
+GLOBAL_ARCH=
+GLOBAL_DISKTYPE=
+GLOBAL_DISKTYPES="mbr gpt"
+GLOBAL_DEFINES=
 
-# Now diverge execution based on action
-if [ "$action" = "prepare" ]
-then
-    # First, check if we need to build to toolchain
-    if [ "$target" = "toolchain" ]
-    then
-        # Create the prefix
-        if [ ! -d "$prefix" ]
-        then
-            mkdir -p $prefix
-        fi
-        prefix="$(pwd)/$prefix"
-        # Switch to the prefix directory
-        cd $prefix
-        mkdir src && cd src
-        # Download gcc and binutils source
-        wget https://ftp.gnu.org/gnu/gcc/gcc-${gccver}/gcc-${gccver}.tar.xz
-        wget https://ftp.gnu.org/gnu/binutils/binutils-${binutilver}.tar.xz
-        # Extract source
-        tar -xf gcc-${gccver}.tar.xz
-        tar -xf binutils-${binutilver}.tar.xz
-        # Now create binutils build folder
-        cd binutils-${binutilver} && mkdir build && cd build
-        # Configure it
-        ../configure --target=${arch}-elf --prefix="$prefix" --disable-nls --disable-werror --with-sysroot
-        # Build it
-        make -j$(nproc)
-        make install -j$(nproc)
-        # Now do the same to GCC
-        cd ../../gcc-${gccver} && mkdir build && cd build
-        ../configure --target=${arch}-elf --prefix="$prefix" --without-headers --enable-languages=c --disable-nls
-        make all-gcc -j$(nproc)
-        make all-target-libgcc -j$(nproc)
-        make install-gcc -j$(nproc)
-        make install-target-libgcc -j$(nproc)
-        # We are done now
-        echo "$0: Cross toolchain built. Please set variable CROSS to ${prefix}/bin"
-    # If we want to build everything
-    elif [ "$target" = "all" ]
-    then
-        # Create the prefix
-        if [ ! -d "$prefix" ]
-        then
-            mkdir -p $prefix/boot
-        fi
-        # Build all first party targets. They are available locally
-        for tar in $buildtar
-        do
-            targetprep $tar  
-        done
-    # If we want to build a certain target
-    else
-        # Create the prefix
-        if [ ! -d "$prefix" ]
-        then
-            mkdir -p $prefix/boot
-            mkdir -p $prefix/usr/include
-        fi
-        for tar in $buildtar
-        do
-            if [ "$tar" = "$target" ]
-            then
-                targetprep $tar
-            fi
-        done
-        # Print out an error
-        echo "$0 - Target $target does not exist!"
-        exit 1
-    fi
-elif [ "$action" = "build" ]
-then
-    # Build the project(s) wanted
-    if [ "$target" = "all" ]
-    then
-        # Install the headers
-        cp -r include/* rootdir/usr/include/
-        # Go through all Nexware projects first
-        for tar in $buildtar
-        do
-            cd $tar/build-$arch
-            make install
-        done
-    # If we want to build a certain target
-    else
-        # Figure out what type this target is
-        for tar in $buildtar
-        do
-            if [ "$tar" = "$target" ]
-            then
-                cd $tar && rm -rf build-$arch && mkdir build-$arch && cd build-$arch
-                make install
-                exit 0
-            fi
-        done
-        # Print out an error
-        echo "$0 - Target $target does not exist!"
-        exit 1
-    fi
-elif [ "$action" = "clean" ]
-then
-    # Check prefix
-    if [ -z "$prefix" ]
-    then
-        echo "$0: Prefix must be set"
-        exit 1
-    fi
-    # Delete all downloaded things
-    rm -rf cross
-    rm -rf $prefix
-    # Clean up nexboot-install
-    if [ "$board" = "pc" ]
-    then
-        cd nexboot-install
-        rm nexboot-install && rm -r build
-        cd ..
-    fi
-    # Now delete the build folders
-    for tar in $nextargets
-    do
-        cd $tar && rm -rf build-$arch
-        cd ..
+# Parses data in the GLOBAL_ARGS variable
+argparse()
+{
+    arglist="A:hj:i:p:a:d:D:"
+    # Start the loop
+    while getopts $arglist arg $GLOBAL_ARGS > /dev/null 2> /dev/null; do
+        case ${arg} in
+            "h")
+                # If -h was passed, print out the help screen
+                help
+                ;;
+            "A")
+                # Check if it is a valid action
+                for action in $GLOBAL_ACTIONS
+                do
+                    # Check it now
+                    if [ "$OPTARG" = "$action" ]
+                    then
+                        GLOBAL_ACTION="$OPTARG"
+                    fi
+                done
+                # Check if we found the action
+                if [ -z "$GLOBAL_ACTION" ]
+                then
+                    panic "Invalid action set"
+                fi
+                ;;
+            "j")
+                # Set the job count
+                GLOBAL_JOBCOUNT="$OPTARG"
+                ;;
+            "i")
+                # Grab the image
+                GLOBAL_IMAGE="$OPTARG"
+                ;;
+            "p")
+                # Grab the prefix directory
+                GLOBAL_PREFIX="$OPTARG"
+                # Check that it is valid
+                if [ -d "$GLOBAL_PREFIX" ]
+                then
+                    message "Prefix already exists! Delete? [y/n]"
+                    read REPLY;
+                    # Check the response
+                    if [ "$REPLY" = "y" ]
+                    then
+                        rm -rf $GLOBAL_PREFIX
+                    else
+                        exit 1
+                    fi
+                fi
+                # Check if the prefix is absolute
+                isabs=$(echo $GLOBAL_PREFIX | grep -o '^/')
+                if [ "$isabs" != '/' ]
+                then
+                    panic "prefix must be an absolute path"
+                fi
+                ;;
+            "a")
+                GLOBAL_ARCH="$OPTARG"
+                ;;
+            "d")
+                # Check its validity
+                for type in $GLOBAL_DISKTYPES
+                do
+                    if [ "$type" = "$OPTARG" ]
+                    then
+                        GLOBAL_DISKTYPE="$OPTARG"
+                    fi
+                done
+                # Check if we found a disk type
+                if [ -z "$GLOBAL_DISKTYPE" ]
+                then
+                    panic "Invalid disk type set"
+                fi
+                ;;
+            "D")
+                # Just grab it
+                GLOBAL_DEFINES="$OPTARG"
+                echo "$GLOBAL_DEFINES"
+                ;;
+            "?")
+                panic "Invalid argument sent"
+        esac
     done
-else
-    echo "$0: Invalid action"
-    exit 1
-fi
+
+}
+
+# Parse the configuration file
+confparse()
+{
+    echo "test"
+}
+
+# Main script function. It controls everything else
+main()
+{
+    # Grab the arguments passed to us
+    GLOBAL_ARGS="$@"
+    # Now we need to parse these arguments
+    argparse
+    # Now we need to read the configuration file
+    confparse
+}
+
+main "$@"

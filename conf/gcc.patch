@@ -1,0 +1,17 @@
+diff -ruN gcc-10.2.0/gcc/config/i386/t-x86_64-elf gcc-10.2.0-patch/gcc/config/i386/t-x86_64-elf
+--- gcc-10.2.0/gcc/config/i386/t-x86_64-elf	1969-12-31 19:00:00.000000000 -0500
++++ gcc-10.2.0-patch/gcc/config/i386/t-x86_64-elf	2021-07-02 18:32:38.743343480 -0400
+@@ -0,0 +1,2 @@
++MULTILIB_OPTIONS += mno-red-zone
++MULTILIB_DIRNAMES += no-red-zone
+diff -ruN gcc-10.2.0/gcc/config.gcc gcc-10.2.0-patch/gcc/config.gcc
+--- gcc-10.2.0/gcc/config.gcc	2021-07-02 18:31:35.838852119 -0400
++++ gcc-10.2.0-patch/gcc/config.gcc	2021-07-02 14:00:42.746994000 -0400
+@@ -1865,6 +1865,7 @@
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h"
+ 	;;
+ x86_64-*-elf*)
++    tmake_file="${tmake_file} i386/t-x86_64-elf"
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
+ 	;;
+ x86_64-*-rtems*)
