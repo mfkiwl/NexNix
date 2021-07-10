@@ -110,8 +110,8 @@ argparse()
                     fi
                 fi
                 # Check if the prefix is absolute
-                isabs=$(echo $GLOBAL_PREFIX | grep -o '^/')
-                if [ "$isabs" != '/' ]
+                isabs=$(echo $GLOBAL_PREFIX | awk '$0 ~ /^\// { print $0 }')
+                if [ -z "$isabs" ]
                 then
                     panic "prefix must be an absolute path"
                 fi
@@ -137,7 +137,6 @@ argparse()
             "D")
                 # Just grab it
                 GLOBAL_DEFINES="$OPTARG"
-                echo "$GLOBAL_DEFINES"
                 ;;
             "?")
                 panic "Invalid argument sent"
@@ -149,18 +148,166 @@ argparse()
 # Parse the configuration file
 confparse()
 {
-    echo "test"
+    # Parser variables
+    parser_firstrun=1
+    parser_secname=
+    parser_subsec=
+    parser_varname=
+    parser_varval=
+    parser_curline=0
+    parser_file=$PWD/conf/nexnix.cfg
+    # Compute the number of lines in the file
+    parser_numlines=$(awk 'END { print NR }' $parser_file)
+    # Loop through every line
+    while :
+    do
+        # Have we reached th last line?
+        if [ $parser_curline -eq $parser_numlines ]
+        then
+            # If so, break out
+            break
+        fi
+        # Increment the current line
+        parser_curline=$(($parser_curline+1))
+        # Here is the main parser. Grab the current line first
+        line="$(sed "$parser_curline!d" $parser_file)"
+        # Check if this is a comment
+        start=$(echo "$line" | awk '/^#/')
+        if [ ! -z "$start" ]
+        then
+            continue
+        fi
+        # Check if this a section marker
+        start=$(echo "$line" | awk '/^\[/')
+        if [ ! -z "$start" ]
+        then
+            # Check for a section end marker
+            end=$(echo "$line" | awk '/]$/')
+            if [ -z "$end" ]
+            then
+                # Syntax error!
+                panic "Syntax error: section start must be followed by section end"
+            fi
+            # Get everything in between the brackets
+            secname=$(echo "$line" | sed 's/^.//')
+            secname=$(echo "$secname" | sed 's/.$//')
+            # Is this an end marker?
+            if [ "$secname" = "END" ]
+            then
+                # Check if we are even in a section
+                if [ -z "$parser_secname" ]
+                then
+                    # Syntax error
+                    panic "Syntax error: end section marker must come after section marker"
+                fi
+                # Check if this ends a section or subsection
+                if [ -z "$parser_subsec" ]
+                then
+                    parser_secname=""
+                else
+                    parser_subsec=""
+                fi
+            else
+                # Check if we have met the max depth
+                if [ ! -z "$parser_subsec" ]
+                then
+                    panic "Syntax error: Maximum section depth is 2!"
+                fi
+                # We now must set the section
+                # Is this a subsection?
+                if [ ! -z "$parser_secname" ]
+                then
+                    parser_subsec="$secname"
+                else
+                    parser_secname="$secname"
+                fi
+            fi
+        # Else this is a variable assignment
+        else
+            # Check if this is whitespace
+            if [ -z "$line" ]
+            then
+                continue
+            fi
+            # Check for a colon
+            iseq=$(echo "$line" | awk '/.:/')
+            if [ -z "$iseq" ]
+            then
+                panic "Syntax error: Variable assignment must have equals colon"
+            fi
+            # Split it into two parts
+            name=$(echo "$line" | awk -F':' '{print $1}')
+            val=$(echo "$line" | awk -F':' '{print $2}')
+            # Ensure that both are present
+            if [ -z "$name" ] || [ -z "$val" ]
+            then
+                panic "Syntax error: Variable requires name and value"
+            fi
+            # Shave off quotation marks
+            val="$(echo "$val" | sed 's/\"//g')"
+            # Prepend the section and subsection names
+            if [ ! -z "$parser_subsec" ]
+            then
+                name="${parser_subsec}_${name}"
+            fi
+            name="${parser_secname}_${name}"
+            # Shave trailing whitespace off of the name
+            name=$(echo "$name" | sed 's/[[:space:]]//g')
+            # Set the variable
+            eval "$name=\$val"
+        fi
+    done
+}
+
+# Parses the -D option
+urideparse()
+{
+    # Check if -D was even sent
+    if [ ! -z "$GLOBAL_DEFINES" ]
+    then
+        # Replace every , with a space
+        GLOBAL_DEFINES="$(echo $GLOBAL_DEFINES | sed 's/,/ /g')"
+        for def in $GLOBAL_DEFINES; do
+            # Parse it
+            # Check for a colon
+            iseq=$(echo "$def" | awk '/.:/')
+            if [ -z "$iseq" ]
+            then
+                panic "Define error: Variable assignment must have a colon"
+            fi
+            # Split it into two parts
+            name=$(echo "$def" | awk -F':' '{print $1}')
+            val=$(echo "$def" | awk -F':' '{print $2}')
+            # Ensure that both are present
+            if [ -z "$name" ] || [ -z "$val" ]
+            then
+                panic "Define error: Variable requires name and value"
+            fi
+            # Shave off quotation marks
+            val="$(echo "$val" | sed 's/\"//g')"
+            # Shave trailing whitespace off of the name
+            name=$(echo "$name" | sed 's/[[:space:]]//g')
+            # Set the variable
+            eval "$name=\$val"
+        done
+    fi
 }
 
 # Main script function. It controls everything else
 main()
 {
+    # Set LC_ALL to C for regex
+    export LC_ALL=C
     # Grab the arguments passed to us
     GLOBAL_ARGS="$@"
     # Now we need to parse these arguments
     argparse
     # Now we need to read the configuration file
     confparse
+    # Now we must parse user specified settings overrides
+    urideparse
+
+    # Now we can finally start to build!
 }
 
 main "$@"
