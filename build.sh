@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /usr/bin/env sh
 # build.sh - the top level build system for NexNix
 # Distributed with NexNix, licensed under the MIT license
 # See LICENSE
@@ -26,36 +26,32 @@ help()
     cat <<end
 $(basename $0) - builds a distribution of NexNix
 $(basename $0) is a powerful script which is used to build the NexNix operating system
-It uses the file conf/nexnix.conf, while contains all configuration data in realtion to NexNix, using an INI like format
+It uses the file conf/nexnix.conf, which contains all configuration data in realtion to NexNix, using an INI like format
 See docs/conf.md for more info on it
 Below are valid options which can be passed to $(basename $0)
     -h - shows this help screen
     -A ACTION - tells the scripts what it needs to do. These include:
-        "build" - builds the system and installs in in the prefix directory
+        "build" - builds the system and install in the prefix
         "clean" - removes all intermediate files / folders
-        "dist" - builds a tarball of the source files
         "image" - builds the system, and then creates a disk image
-        "dump" - dumps all valid architectures
+        "dep" - builds dependencies such as the toolchain
     This option is required
-    -j JOBS - specifies how many concurrent jobs to use. If the nproc(1) command is available, then this is the default, else, 1 is the default
+    -j JOBS - specifies how many concurrent jobs to use. 1 is the default
     -i IMAGE - specifies the disk image to output to. Required for action "image", else unused
-    -p PREFIX - specifies directory to install everything into. Required for actions "build" and "image", unused for everything else
+    -p PREFIX - specifies directory to install everything into. Required for actions "build", "image", and "dep"
     -a ARCH - specifies the target architecture to build for. Required for actions "build" and "image"
-    -d DISKTYPE - specifies the partition format for the disk. It can be either "mbr" or "gpt". Note that architectural\
-restrictions may constraint this option
     -D "PARAMS" - contains configuration overrides. This allows for users to override the default configuration in nexnix.conf
 end
+    exit 0
 }
 # Main variables
 GLOBAL_ARGS=
 GLOBAL_ACTION=
-GLOBAL_ACTIONS="build clean image dist dump"
-GLOBAL_JOBCOUNT=
-GLOBAL_PREFIX=
-GLOBAL_IMAGE=
-GLOBAL_ARCH=
-GLOBAL_DISKTYPE=
-GLOBAL_DISKTYPES="mbr gpt"
+GLOBAL_ACTIONS="clean image dep build"
+export GLOBAL_JOBCOUNT=1
+export GLOBAL_PREFIX=
+export GLOBAL_IMAGE=
+export GLOBAL_ARCH=
 GLOBAL_DEFINES=
 
 # Parses data in the GLOBAL_ARGS variable
@@ -70,69 +66,23 @@ argparse()
                 help
                 ;;
             "A")
-                # Check if it is a valid action
-                for action in $GLOBAL_ACTIONS
-                do
-                    # Check it now
-                    if [ "$OPTARG" = "$action" ]
-                    then
-                        GLOBAL_ACTION="$OPTARG"
-                    fi
-                done
-                # Check if we found the action
-                if [ -z "$GLOBAL_ACTION" ]
-                then
-                    panic "Invalid action set"
-                fi
+                # Grab the action
+                GLOBAL_ACTION="$OPTARG"
                 ;;
             "j")
                 # Set the job count
-                GLOBAL_JOBCOUNT="$OPTARG"
+                export GLOBAL_JOBCOUNT="$OPTARG"
                 ;;
             "i")
                 # Grab the image
-                GLOBAL_IMAGE="$OPTARG"
+                export GLOBAL_IMAGE="$OPTARG"
                 ;;
             "p")
                 # Grab the prefix directory
-                GLOBAL_PREFIX="$OPTARG"
-                # Check that it is valid
-                if [ -d "$GLOBAL_PREFIX" ]
-                then
-                    message "Prefix already exists! Delete? [y/n]"
-                    read REPLY;
-                    # Check the response
-                    if [ "$REPLY" = "y" ]
-                    then
-                        rm -rf $GLOBAL_PREFIX
-                    else
-                        exit 1
-                    fi
-                fi
-                # Check if the prefix is absolute
-                isabs=$(echo $GLOBAL_PREFIX | awk '$0 ~ /^\// { print $0 }')
-                if [ -z "$isabs" ]
-                then
-                    panic "prefix must be an absolute path"
-                fi
+                export GLOBAL_PREFIX="$OPTARG"
                 ;;
             "a")
-                GLOBAL_ARCH="$OPTARG"
-                ;;
-            "d")
-                # Check its validity
-                for type in $GLOBAL_DISKTYPES
-                do
-                    if [ "$type" = "$OPTARG" ]
-                    then
-                        GLOBAL_DISKTYPE="$OPTARG"
-                    fi
-                done
-                # Check if we found a disk type
-                if [ -z "$GLOBAL_DISKTYPE" ]
-                then
-                    panic "Invalid disk type set"
-                fi
+                export GLOBAL_ARCH="$OPTARG"
                 ;;
             "D")
                 # Just grab it
@@ -177,10 +127,14 @@ confparse()
         then
             continue
         fi
+        # Shave whitespace
+        wfree=$(echo "$line" | sed 's/[[:space:]]//g')
         # Check if this a section marker
-        start=$(echo "$line" | awk '/^\[/')
+        start=$(echo "$wfree" | awk '/^\[/')
         if [ ! -z "$start" ]
         then
+            # Trim off whitespace
+            line=$(echo "$line" | sed 's/[[:space:]]//g')
             # Check for a section end marker
             end=$(echo "$line" | awk '/]$/')
             if [ -z "$end" ]
@@ -233,10 +187,12 @@ confparse()
             iseq=$(echo "$line" | awk '/.:/')
             if [ -z "$iseq" ]
             then
-                panic "Syntax error: Variable assignment must have equals colon"
+                panic "Syntax error: Variable assignment must have colon"
             fi
             # Split it into two parts
             name=$(echo "$line" | awk -F':' '{print $1}')
+            # Trim off leading whitespace
+            name=$(echo "$name" | sed 's/[[:space:]]//g')
             val=$(echo "$line" | awk -F':' '{print $2}')
             # Ensure that both are present
             if [ -z "$name" ] || [ -z "$val" ]
@@ -255,6 +211,7 @@ confparse()
             name=$(echo "$name" | sed 's/[[:space:]]//g')
             # Set the variable
             eval "$name=\$val"
+            export $name
         fi
     done
 }
@@ -289,8 +246,115 @@ urideparse()
             name=$(echo "$name" | sed 's/[[:space:]]//g')
             # Set the variable
             eval "$name=\$val"
+            export $name
         done
     fi
+}
+
+# Checks for data sanity
+sanitycheck()
+{
+    # Check for a valid action
+    if [ -z "$GLOBAL_ACTION" ]
+    then
+        panic "Action must be set"
+    fi
+    foundaction=0
+    for action in $GLOBAL_ACTIONS
+    do
+        if [ "$action" = "$GLOBAL_ACTION" ]
+        then
+            foundaction=1
+            break
+        fi
+    done
+    # Check if the action was found
+    if [ $foundaction -eq 0 ]
+    then
+        panic "Invalid action set"
+    fi
+    # Now diverge based on action
+    if [ "$GLOBAL_ACTION" = "clean" ]
+    then
+        # Exit now, we have all we need
+        return
+    elif [ "$GLOBAL_ACTION" = "image" ]
+    then
+        # Check everything image specific
+        if [ -z "$GLOBAL_IMAGE" ]
+        then
+            panic "Image must be sent"
+        fi
+        # Check if it already exists
+        if [ -f "$GLOBAL_IMAGE" ]
+        then
+            # Ask for user confirmation
+            message "$GLOBAL_IMAGE already exists. Do you want to delete it [y/n]?"
+            read REPLY;
+            if [ "$REPLY" = "y" ]
+            then
+                # Delete it
+                rm -f $GLOBAL_IMAGE
+            else
+                exit 0
+            fi
+        fi
+    fi
+    # Now check common stuff
+    if [ ! -z "$GLOBAL_JOBCOUNT" ]
+    then
+        # Check if it is a number
+        isnum=$(echo $GLOBAL_JOBCOUNT | awk '$0 ~ /[0-9]/')
+        if [ -z "$isnum" ]
+        then
+            panic "Job count must be a number"
+        fi
+    fi
+    # If we are building dependencies, we are done
+    if [ "$GLOBAL_ACTION" = "dep" ]
+    then
+        return
+    fi
+    # Check the prefix
+    if [ -z "$GLOBAL_PREFIX" ]
+    then
+        panic "Prefix must be set"
+    fi
+    if [ -f "$GLOBAL_PREFIX" ]
+    then
+        # Ask for user confirmation
+        message "$GLOBAL_PREFIX already exists. Do you want to delete it [y/n]?"
+        read REPLY;
+        if [ "$REPLY" = "y" ]
+        then
+            # Delete it
+            rm -rf $GLOBAL_PREFIX
+        else
+            exit 0
+        fi
+    fi
+    # Else, check the architecture
+    if [ -z "$GLOBAL_ARCH" ] || [ -z "$GLOBAL_ARCHS" ]
+    then
+        panic "Architecture must be set"
+    fi
+    archfound=0
+    for arch in $GLOBAL_ARCHS
+    do
+        if [ "$arch" = "$GLOBAL_ARCH" ]
+        then
+            archfound=1
+            break
+        fi
+    done
+    if [ $archfound -eq 0 ]
+    then
+        # Panic about it
+        panic "Architecture invalid"
+    fi
+    # Split it up
+    export GLOBAL_MACH=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $1 }')
+    export GLOBAL_BOARD=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $2 }')
 }
 
 # Main script function. It controls everything else
@@ -300,14 +364,19 @@ main()
     export LC_ALL=C
     # Grab the arguments passed to us
     GLOBAL_ARGS="$@"
-    # Now we need to parse these arguments
-    argparse
     # Now we need to read the configuration file
     confparse
+    # Parse args
+    argparse
     # Now we must parse user specified settings overrides
     urideparse
-
-    # Now we can finally start to build!
+    # Check that it is all valid
+    sanitycheck
+    # Run based on action now
+    if [ "$GLOBAL_ACTION" = "dep" ]
+    then
+        ./dep/builddep.sh
+    fi
 }
 
 main "$@"

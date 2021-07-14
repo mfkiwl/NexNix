@@ -1,12 +1,21 @@
-diff -ruN gcc-10.2.0/gcc/config/i386/t-x86_64-elf gcc-10.2.0-patch/gcc/config/i386/t-x86_64-elf
---- gcc-10.2.0/gcc/config/i386/t-x86_64-elf	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-10.2.0-patch/gcc/config/i386/t-x86_64-elf	2021-07-02 18:32:38.743343480 -0400
+diff -Naur gcc-10.2.0/gcc/config/i386/t-x86_64-elf gcc-10.2.0-patch/gcc/config/i386/t-x86_64-elf
+--- gcc-10.2.0/gcc/config/i386/t-x86_64-elf	1970-01-01 00:00:00.000000000 +0000
++++ gcc-10.2.0-patch/gcc/config/i386/t-x86_64-elf	2021-07-14 14:52:55.053480791 +0000
 @@ -0,0 +1,2 @@
 +MULTILIB_OPTIONS += mno-red-zone
 +MULTILIB_DIRNAMES += no-red-zone
-diff -ruN gcc-10.2.0/gcc/config.gcc gcc-10.2.0-patch/gcc/config.gcc
---- gcc-10.2.0/gcc/config.gcc	2021-07-02 18:31:35.838852119 -0400
-+++ gcc-10.2.0-patch/gcc/config.gcc	2021-07-02 14:00:42.746994000 -0400
+diff -Naur gcc-10.2.0/gcc/config.gcc gcc-10.2.0-patch/gcc/config.gcc
+--- gcc-10.2.0/gcc/config.gcc	2020-07-23 06:35:17.316384243 +0000
++++ gcc-10.2.0-patch/gcc/config.gcc	2021-07-14 14:53:38.525154875 +0000
+@@ -180,7 +180,7 @@
+ #			the --with-sysroot configure option or the
+ #			--sysroot command line option is used this
+ #			will be relative to the sysroot.
+-# target_type_format_char 
++# target_type_format_char
+ # 			The default character to be used for formatting
+ #			the attribute in a
+ #			.type symbol_name, ${t_t_f_c}<property>
 @@ -1865,6 +1865,7 @@
  	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h"
  	;;

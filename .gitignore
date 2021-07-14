@@ -6,3 +6,4 @@ deps
 *.img
 bochs.txt
 bochs.log
+patch
