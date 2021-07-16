@@ -19,6 +19,14 @@ message()
     echo "$name: $1"
 }
 
+# Check a return value for errors
+checkerror()
+{
+    if [ "$1" != "0" ]
+    then
+        panic "$2"
+    fi
+}
 
 help()
 {
@@ -41,6 +49,7 @@ Below are valid options which can be passed to $(basename $0)
     -p PREFIX - specifies directory to install everything into. Required for actions "build", "image", and "dep"
     -a ARCH - specifies the target architecture to build for. Required for actions "build" and "image"
     -D "PARAMS" - contains configuration overrides. This allows for users to override the default configuration in nexnix.conf
+    -d - specifies that we are in debug mode
 end
     exit 0
 }
@@ -52,12 +61,14 @@ export GLOBAL_JOBCOUNT=1
 export GLOBAL_PREFIX=
 export GLOBAL_IMAGE=
 export GLOBAL_ARCH=
+export GLOBAL_DEBUG=0
 GLOBAL_DEFINES=
+GLOBAL_CMAKEVARS=
 
 # Parses data in the GLOBAL_ARGS variable
 argparse()
 {
-    arglist="A:hj:i:p:a:d:D:"
+    arglist="A:hj:i:p:a:dD:"
     # Start the loop
     while getopts $arglist arg $GLOBAL_ARGS > /dev/null 2> /dev/null; do
         case ${arg} in
@@ -88,6 +99,9 @@ argparse()
                 # Just grab it
                 GLOBAL_DEFINES="$OPTARG"
                 ;;
+            "d")
+                export GLOBAL_DEBUG=1
+                ;;
             "?")
                 panic "Invalid argument sent"
         esac
@@ -98,6 +112,7 @@ argparse()
 # Parse the configuration file
 confparse()
 {
+    GLOBAL_CMAKEVARS=
     # Parser variables
     parser_firstrun=1
     parser_secname=
@@ -212,6 +227,8 @@ confparse()
             # Set the variable
             eval "$name=\$val"
             export $name
+            val=$(eval "echo $val")
+            GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -D${name}=\"${val}\""
         fi
     done
 }
@@ -247,6 +264,8 @@ urideparse()
             # Set the variable
             eval "$name=\$val"
             export $name
+            val=$(eval "\$val")
+            GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -D\"${name}=\"${val}\"\""
         done
     fi
 }
@@ -354,7 +373,9 @@ sanitycheck()
     fi
     # Split it up
     export GLOBAL_MACH=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $1 }')
+    GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DGLOBAL_MACH=\"${GLOBAL_MACH}\""
     export GLOBAL_BOARD=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $2 }')
+    GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DGLOBAL_BOARD=\"${GLOBAL_BOARD}\""
 }
 
 # Main script function. It controls everything else
@@ -364,10 +385,10 @@ main()
     export LC_ALL=C
     # Grab the arguments passed to us
     GLOBAL_ARGS="$@"
-    # Now we need to read the configuration file
-    confparse
     # Parse args
     argparse
+    # Now we need to read the configuration file
+    confparse
     # Now we must parse user specified settings overrides
     urideparse
     # Check that it is all valid
@@ -376,6 +397,38 @@ main()
     if [ "$GLOBAL_ACTION" = "dep" ]
     then
         ./dep/builddep.sh
+    elif [ "$GLOBAL_ACTION" = "image" ]
+    then
+        # Install the headers first
+        mkdir -p $GLOBAL_PREFIX/usr/include
+        cp -r $PWD/usr/include/* $GLOBAL_PREFIX/usr/include
+        if [ ! -d "build-$GLOBAL_ARCH" ]
+        then
+            mkdir build-$GLOBAL_ARCH
+        fi
+        cd build-$GLOBAL_ARCH
+        eval cmake .. -G"Ninja" -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" $GLOBAL_CMAKEVARS
+        checkerror $? "prepare failed"
+        ninja -j$GLOBAL_JOBCOUNT
+        checkerror $? "build failed"
+        ninja install -j$GLOBAL_JOBCOUNT
+        checkerror $? "install failed"
+    elif [ "$GLOBAL_ACTION" = "build" ]
+    then
+        if [ ! -d "build-$GLOBAL_ARCH" ]
+        then
+            mkdir build-$GLOBAL_ARCH
+        fi
+        cd build-$GLOBAL_ARCH
+        eval cmake .. -G"Ninja" -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" $GLOBAL_CMAKEVARS
+        checkerror $? "prepare failed"
+        ninja -j$GLOBAL_JOBCOUNT
+        checkerror $? "build failed"
+        ninja install -j$GLOBAL_JOBCOUNT
+        checkerror $? "install failed"
+    elif [ "$GLOBAL_ACTION" = "clean" ]
+    then
+        rm -rf build-*
     fi
 }
 

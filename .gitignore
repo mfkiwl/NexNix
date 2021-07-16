@@ -7,3 +7,4 @@ deps
 bochs.txt
 bochs.log
 patch
+build-*
