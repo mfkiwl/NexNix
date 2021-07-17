@@ -7,7 +7,10 @@
 #include <stdio.h>
 
 // Argument parsing functions
+void argparse(int argc, char** argv)
+{
 
+}
 
 int main(int argc, char** argv)
 {
