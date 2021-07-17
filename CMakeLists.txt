@@ -3,10 +3,10 @@
 # See LICENSE
 
 # Get this taken care of
-cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
 
 # Project definition
-project(NexNix VERSION 0.0.1)
+project(NexNix VERSION 0.01)
 enable_language(C ASM)
 
 # Check for required variables

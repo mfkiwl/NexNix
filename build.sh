@@ -304,20 +304,6 @@ sanitycheck()
         then
             panic "Image must be sent"
         fi
-        # Check if it already exists
-        if [ -f "$GLOBAL_IMAGE" ]
-        then
-            # Ask for user confirmation
-            message "$GLOBAL_IMAGE already exists. Do you want to delete it [y/n]?"
-            read REPLY;
-            if [ "$REPLY" = "y" ]
-            then
-                # Delete it
-                rm -f $GLOBAL_IMAGE
-            else
-                exit 0
-            fi
-        fi
     fi
     # Now check common stuff
     if [ ! -z "$GLOBAL_JOBCOUNT" ]
@@ -339,18 +325,11 @@ sanitycheck()
     then
         panic "Prefix must be set"
     fi
-    if [ -f "$GLOBAL_PREFIX" ]
+    # Check that is absolute
+    isabs=$(echo "$GLOBAL_PREFIX" | awk '$0 ~ /^\// { print $0 }')
+    if [ -z "$isabs" ]
     then
-        # Ask for user confirmation
-        message "$GLOBAL_PREFIX already exists. Do you want to delete it [y/n]?"
-        read REPLY;
-        if [ "$REPLY" = "y" ]
-        then
-            # Delete it
-            rm -rf $GLOBAL_PREFIX
-        else
-            exit 0
-        fi
+        panic "prefix must be absolute"
     fi
     # Else, check the architecture
     if [ -z "$GLOBAL_ARCH" ] || [ -z "$GLOBAL_ARCHS" ]
@@ -407,24 +386,27 @@ main()
             mkdir build-$GLOBAL_ARCH
         fi
         cd build-$GLOBAL_ARCH
-        eval cmake .. -G"Ninja" -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" $GLOBAL_CMAKEVARS
+        eval cmake .. -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" $GLOBAL_CMAKEVARS
         checkerror $? "prepare failed"
-        ninja -j$GLOBAL_JOBCOUNT
+        make -j$GLOBAL_JOBCOUNT
         checkerror $? "build failed"
-        ninja install -j$GLOBAL_JOBCOUNT
+        make install -j$GLOBAL_JOBCOUNT
         checkerror $? "install failed"
     elif [ "$GLOBAL_ACTION" = "build" ]
     then
+        # Install the headers first
+        mkdir -p $GLOBAL_PREFIX/usr/include
+        cp -r $PWD/usr/include/* $GLOBAL_PREFIX/usr/include
         if [ ! -d "build-$GLOBAL_ARCH" ]
         then
             mkdir build-$GLOBAL_ARCH
         fi
         cd build-$GLOBAL_ARCH
-        eval cmake .. -G"Ninja" -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" $GLOBAL_CMAKEVARS
+        eval cmake .. -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" $GLOBAL_CMAKEVARS
         checkerror $? "prepare failed"
-        ninja -j$GLOBAL_JOBCOUNT
+        make -j$GLOBAL_JOBCOUNT
         checkerror $? "build failed"
-        ninja install -j$GLOBAL_JOBCOUNT
+        make install -j$GLOBAL_JOBCOUNT
         checkerror $? "install failed"
     elif [ "$GLOBAL_ACTION" = "clean" ]
     then
