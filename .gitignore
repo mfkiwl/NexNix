@@ -8,3 +8,6 @@ bochs.txt
 bochs.log
 patch
 build-*
+gmon.out
+prof.txt
+.VSCodeCounter

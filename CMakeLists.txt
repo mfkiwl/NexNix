@@ -40,6 +40,17 @@ if(NOT DEFINED GLOBAL_BOARD)
     return()
 endif()
 
+# Set the common arch
+if(${GLOBAL_MACH} EQUAL "i686")
+    set(GLOBAL_ARCHCOMMON "x86")
+elseif(${GLOBAL_MACH} EQUAL "x86_64")
+    set(GLOBAL_ARCHCOMMON "x86")
+elseif(${GLOBAL_MACH} EQUAL "riscv64")
+    set(GLOBAL_ARCHCOMMON "riscv")
+elseif(${GLOBAL_MACH} EQUAL "aarch64")
+    set(GLOBAL_ARCHCOMMON "arm")
+endif()
+
 # Add each subdirectory
 foreach(dir ${GLOBAL_PROJECTS})
     add_subdirectory(${dir})

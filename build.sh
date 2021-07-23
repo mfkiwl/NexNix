@@ -45,11 +45,13 @@ Below are valid options which can be passed to $(basename $0)
         "dep" - builds dependencies such as the toolchain
     This option is required
     -j JOBS - specifies how many concurrent jobs to use. 1 is the default
-    -i IMAGE - specifies the disk image to output to. Required for action "image", else unused
+    -i IMAGE - specifies the directory to output disk images to. Required for action "image", else unused
     -p PREFIX - specifies directory to install everything into. Required for actions "build", "image", and "dep"
     -a ARCH - specifies the target architecture to build for. Required for actions "build" and "image"
     -D "PARAMS" - contains configuration overrides. This allows for users to override the default configuration in nexnix.conf
     -d - specifies that we are in debug mode
+    -P - specifies that profiling is to be enabled. This should be used with -d for optimal results
+    -n - use Ninja as the build system.  Requires package ninja to be installed. Note that on Debian, this package is "ninja-build"
 end
     exit 0
 }
@@ -62,13 +64,15 @@ export GLOBAL_PREFIX=
 export GLOBAL_IMAGE=
 export GLOBAL_ARCH=
 export GLOBAL_DEBUG=0
+export GLOBAL_PROFILE=0
 GLOBAL_DEFINES=
 GLOBAL_CMAKEVARS=
+GLOBAL_USENINJA=0
 
 # Parses data in the GLOBAL_ARGS variable
 argparse()
 {
-    arglist="A:hj:i:p:a:dD:"
+    arglist="A:hj:i:p:a:dD:Pn"
     # Start the loop
     while getopts $arglist arg $GLOBAL_ARGS > /dev/null 2> /dev/null; do
         case ${arg} in
@@ -95,12 +99,18 @@ argparse()
             "a")
                 export GLOBAL_ARCH="$OPTARG"
                 ;;
+            "n")
+                GLOBAL_USENINJA=1
+                ;;
             "D")
                 # Just grab it
                 GLOBAL_DEFINES="$OPTARG"
                 ;;
             "d")
                 export GLOBAL_DEBUG=1
+                ;;
+            "P")
+                export GLOBAL_PROFILE=1
                 ;;
             "?")
                 panic "Invalid argument sent"
@@ -315,11 +325,6 @@ sanitycheck()
             panic "Job count must be a number"
         fi
     fi
-    # If we are building dependencies, we are done
-    if [ "$GLOBAL_ACTION" = "dep" ]
-    then
-        return
-    fi
     # Check the prefix
     if [ -z "$GLOBAL_PREFIX" ]
     then
@@ -357,57 +362,88 @@ sanitycheck()
     GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DGLOBAL_BOARD=\"${GLOBAL_BOARD}\""
 }
 
+# Builds the system
+build()
+{
+    # Install the headers first
+    mkdir -p $GLOBAL_PREFIX/usr/include
+    cp -r $PWD/usr/include/* $GLOBAL_PREFIX/usr/include
+    if [ ! -d "build-$GLOBAL_ARCH" ]
+    then
+        mkdir build-$GLOBAL_ARCH
+    fi
+    if [ $GLOBAL_USENINJA -eq 1 ]
+    then
+        # Check for ninja
+        if ! command -v ninja > /dev/null
+        then
+            panic "Ninja not found"
+        fi
+        CMAKEGEN="Ninja"
+        BUILDPROG=ninja
+    else
+        CMAKEGEN="Unix Makefiles"
+        BUILDPROG=make
+    fi
+
+    # First build neximg
+    if [ ! -d build-neximg ]
+    then
+        mkdir build-neximg
+    fi
+    cd build-neximg
+    cmake ../neximg -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" -G$CMAKEGEN -DGLOBAL_DEBUG="$GLOBAL_DEBUG" \
+        -DGLOBAL_PROFILE="$GLOBAL_PROFILE"
+    checkerror $? "prepare failed"
+    $BUILDPROG -j8
+    checkerror $? "build failed"
+    $BUILDPROG install -j8
+    checkerror $? "install failed"
+    cd ..
+    # Build the rest of the system
+    cd build-$GLOBAL_ARCH
+    eval cmake .. -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" -G$CMAKEGEN $GLOBAL_CMAKEVARS
+    checkerror $? "prepare failed"
+    $BUILDPROG -j$GLOBAL_JOBCOUNT
+    checkerror $? "build failed"
+    $BUILDPROG install -j$GLOBAL_JOBCOUNT
+    checkerror $? "install failed"
+}
+
 # Main script function. It controls everything else
 main()
 {
     # Set LC_ALL to C for regex
     export LC_ALL=C
+    # Check that getopts is supported
+    if ! command -v getopts > /dev/null
+    then
+        panic "nearly POSIX compliant shell required"
+    fi
     # Grab the arguments passed to us
     GLOBAL_ARGS="$@"
-    # Parse args
+    # Parse args, as some configuration file parameters depend on this
     argparse
     # Now we need to read the configuration file
     confparse
+    # Parse the arguments again to override the configuration file
+    argparse
     # Now we must parse user specified settings overrides
     urideparse
     # Check that it is all valid
     sanitycheck
+    # Set debug and profiling values
+    GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DGLOBAL_DEBUG=\"${GLOBAL_DEBUG}\" -DGLOBAL_PROFILE=\"${GLOBAL_PROFILE}\""
     # Run based on action now
     if [ "$GLOBAL_ACTION" = "dep" ]
     then
         ./dep/builddep.sh
     elif [ "$GLOBAL_ACTION" = "image" ]
     then
-        # Install the headers first
-        mkdir -p $GLOBAL_PREFIX/usr/include
-        cp -r $PWD/usr/include/* $GLOBAL_PREFIX/usr/include
-        if [ ! -d "build-$GLOBAL_ARCH" ]
-        then
-            mkdir build-$GLOBAL_ARCH
-        fi
-        cd build-$GLOBAL_ARCH
-        eval cmake .. -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" $GLOBAL_CMAKEVARS
-        checkerror $? "prepare failed"
-        make -j$GLOBAL_JOBCOUNT
-        checkerror $? "build failed"
-        make install -j$GLOBAL_JOBCOUNT
-        checkerror $? "install failed"
+        build
     elif [ "$GLOBAL_ACTION" = "build" ]
     then
-        # Install the headers first
-        mkdir -p $GLOBAL_PREFIX/usr/include
-        cp -r $PWD/usr/include/* $GLOBAL_PREFIX/usr/include
-        if [ ! -d "build-$GLOBAL_ARCH" ]
-        then
-            mkdir build-$GLOBAL_ARCH
-        fi
-        cd build-$GLOBAL_ARCH
-        eval cmake .. -DCMAKE_INSTALL_PREFIX="$GLOBAL_PREFIX" $GLOBAL_CMAKEVARS
-        checkerror $? "prepare failed"
-        make -j$GLOBAL_JOBCOUNT
-        checkerror $? "build failed"
-        make install -j$GLOBAL_JOBCOUNT
-        checkerror $? "install failed"
+        build
     elif [ "$GLOBAL_ACTION" = "clean" ]
     then
         rm -rf build-*
