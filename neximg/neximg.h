@@ -21,8 +21,9 @@
 
 // Argument information
 #define ARG_IMG 1
+#define ARG_IMGSZ  7
 #define ARG_DSKFMT 2
-#define ARG_PARTS 7
+#define ARG_PARTS 8
 #define ARG_BLOCKSZ 6
 #define ARG_SECTORSZ 5
 #define ARG_DIR 4
@@ -35,7 +36,7 @@ typedef struct _arg
 }arg_t;
 
 // getopt string
-#define ARG_GETOPTSTR "i:t:p:d:fhs:b:"
+#define ARG_GETOPTSTR "i:t:p:d:fhs:b:c:"
 
 // Disk types
 #define DTYP_GPT 0

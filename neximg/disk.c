@@ -24,7 +24,7 @@ int diskinit()
     else
         disk.blocksz = blockszarg->data;
 
-    // Open up the file
+    // Get the image data
     arg_t* imgarg = argget(ARG_IMG);
     assert(imgarg);
     

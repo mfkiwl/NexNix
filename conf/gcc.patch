@@ -1,11 +1,11 @@
-diff -Naur gcc-10.2.0/gcc/config/i386/t-x86_64-elf gcc-10.2.0-patch/gcc/config/i386/t-x86_64-elf
---- gcc-10.2.0/gcc/config/i386/t-x86_64-elf	1970-01-01 00:00:00.000000000 +0000
+diff -Naur gcc-11.1.0/gcc/config/i386/t-x86_64-elf gcc-10.2.0-patch/gcc/config/i386/t-x86_64-elf
+--- gcc-11.1.0/gcc/config/i386/t-x86_64-elf	1970-01-01 00:00:00.000000000 +0000
 +++ gcc-10.2.0-patch/gcc/config/i386/t-x86_64-elf	2021-07-14 14:52:55.053480791 +0000
 @@ -0,0 +1,2 @@
 +MULTILIB_OPTIONS += mno-red-zone
 +MULTILIB_DIRNAMES += no-red-zone
-diff -Naur gcc-10.2.0/gcc/config.gcc gcc-10.2.0-patch/gcc/config.gcc
---- gcc-10.2.0/gcc/config.gcc	2020-07-23 06:35:17.316384243 +0000
+diff -Naur gcc-11.1.0/gcc/config.gcc gcc-10.2.0-patch/gcc/config.gcc
+--- gcc-11.1.0/gcc/config.gcc	2020-07-23 06:35:17.316384243 +0000
 +++ gcc-10.2.0-patch/gcc/config.gcc	2021-07-14 14:53:38.525154875 +0000
 @@ -180,7 +180,7 @@
  #			the --with-sysroot configure option or the

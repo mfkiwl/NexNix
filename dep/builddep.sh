@@ -169,7 +169,7 @@ buildbinutils()
 {
     cd $GLOBAL_PREFIX/src
     # Check if binutils needs to be built
-    if [ -f "$PWD/../bin/$GLOBAL_MACH-elf-ld" -a $REBUILD -ne 1 ]
+    if [ -f "$PWD/../bin/$GLOBAL_MACH-elf-ld" ] && [ "$REBUILD" != "1" ]
     then
         return
     fi
@@ -217,7 +217,7 @@ buildgcc()
     cd $GLOBAL_PREFIX/src
 
     # Check if binutils needs to be built
-    if [ -f "$PWD/../bin/$GLOBAL_MACH-elf-gcc" - $REBUILD -ne 1 ]
+    if [ -f "$PWD/../bin/$GLOBAL_MACH-elf-gcc" ] && [ "$REBUILD" != "1" ]
     then
         return
     fi
