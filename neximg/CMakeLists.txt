@@ -21,5 +21,7 @@ if(${GLOBAL_PROFILE} EQUAL 1)
 endif()
 
 add_executable(neximg   main.c
-                        disk.c)
+                        disk.c
+                        part.c
+                        mbr.c)
 install(TARGETS neximg DESTINATION ${CMAKE_INSTALL_PREFIX}/util)

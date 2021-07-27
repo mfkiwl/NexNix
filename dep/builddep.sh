@@ -46,7 +46,7 @@ printdep()
     echo "In order to build NexNix, the following is required:"
     echo "A nearly POSIX compliant shell, bash (for building the toolchain), \
 GNU make (for building the toolchain), perl, texinfo, system build utilites (gcc, make, etc) \
-cmake, tar, flex, bison, gettext, and, optionally, the ninja build system"
+cmake, tar, flex, bison, gettext, wget, and, optionally, the ninja build system"
 }
 
 # Checks one individual dependency

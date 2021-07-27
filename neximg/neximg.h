@@ -18,6 +18,10 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <locale.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <time.h>
 
 // Argument information
 #define ARG_IMG 1
@@ -44,16 +48,14 @@ typedef struct _arg
 #define DTYP_ISO9660 2
 
 // File systems
-#define FS_FAT32 0
-#define FS_EXT2 1
-#define FS_ISO9660 2
+#define FS_FAT32 1
+#define FS_EXT2 2
 #define FS_FAT16 3
 
 // Partition entry argument format
 typedef struct _part
 {
-    char* fstype;               // The FS string
-    uint32_t start;             // The start value, in sectors
+    uint8_t fstype;             // The FS string
     uint32_t size;              // The size, in sectors
     uint8_t isboot;             // Specifies if this is the bootable partition
 }part_t;
@@ -62,6 +64,12 @@ typedef struct _part
 
 // Grabs an argument
 arg_t* argget(int argid);
+
+// Gets the program name
+char* getprogname();
+
+// Gets the number of partitions
+int getnumparts();
 
 // Disk stuff
 #define DISK_DEFSECTSZ 512
@@ -72,10 +80,43 @@ typedef struct _disk
     int sectsz;                 // The size of a sector
     int blocksz;                // The size of a block
     int fd;                     // File descriptor for the image
-    int wantedfs;               // The wanted file system
+    int sectcount;              // The number of sectors in this disk
 }disk_t;
 
 // Disk functions
+
+// Sets up the disk
 int diskinit();
+
+// Releases the disk
+void diskrelease();
+
+// Reads a sector in
+int diskread(int sector, void* buf, uint8_t count);
+
+// Writes out a sector
+int diskwrite(int sector, void* buf, uint8_t count);
+
+// Returns the disk data
+disk_t* diskget();
+
+// Partition functions
+
+// Creates the partition table
+int partcreate();
+
+// Frees partition table data
+void partfree();
+
+// The partition table data structure
+typedef struct _parts
+{
+    part_t** parts;             // The array of partitions
+    int countpart;              // The number of partitions
+    int table;                  // The partition table type
+}parts_t;
+
+// Creates a MBR partition table
+int mbrcreate(parts_t* parts);
 
 #endif

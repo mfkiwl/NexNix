@@ -84,8 +84,8 @@ int argparse(int argc, char** argv)
                 printf("   -c COUNT - the number of sectors for this disk, and tell neximg to create the image");
                 printf("   -h       - shows this menu\n");
                 printf("The format of a partition entry is shown below:\n");
-                printf("   startsect,size,fs,boot\n\n");
-                printf("\"startsect\" and \"size\" must be a number, \"fs\" can be either ");
+                printf("   size,fs,boot\n\n");
+                printf("\"size\" must be a number, \"fs\" can be either ");
                 printf("fat32, fat16, or ext2. \"boot\" must be 0 or 1. There can only be one bootable partition. No field is optional\n");
                 printf("For MBR and GPT disks, the -f option is optional. For ISO 9660 and floppy, the -f and -p options are ignored\n");
                 printf("-s must be before and -p options, else weird things may occur\n");
@@ -123,35 +123,28 @@ int argparse(int argc, char** argv)
                     printf("%s: Invalid partition entry\n", progname);
                     return -1;
                 }
-                part->start = atoi(tok);
-                if(!part->start)
-                {
-                    printf("%s: Invalid partition entry\n", progname);
-                    return -1;
-                }
-                tok = strtok(NULL, ",");
-                if(tok == NULL)
-                {
-                    printf("%s: Invalid partition entry\n", progname);
-                    return -1;
-                }
                 part->size = atoi(tok);
                 if(!part->size)
                 {
                     printf("%s: Invalid partition entry\n", progname);
                     return -1;
                 }
-                part->fstype = strtok(NULL, ",");
-                if(part->fstype == NULL)
+                char* fstype = strtok(NULL, ",");
+                if(fstype == NULL)
                 {
                     printf("%s: Invalid partition entry\n", progname);
                     return -1;
                 }
-                // Verify the FSType is valid
-                if(strcmp(part->fstype, "ext2") && strcmp(part->fstype, "fat32") 
-                    && strcmp(part->fstype, "fat16"))
+                // Get the numeric version
+                if(!strcmp(fstype, "fat32"))
+                    part->fstype = FS_FAT32;
+                else if(!strcmp(fstype, "fat16"))
+                    part->fstype = FS_FAT16;
+                else if(!strcmp(fstype, "ext2"))
+                    part->fstype = FS_EXT2;
+                else
                 {
-                    printf("%s: Invalid partition entry\n", progname);
+                    printf("%s: Invalid filesystem type\n", progname);
                     return -1;
                 }
                 tok = strtok(NULL, ",");
@@ -283,7 +276,6 @@ int argcheck()
         }
         else if(arg->type == ARG_PARTS)
         {
-            assert(i <= ARG_PARTS);
             assert(arg->data);
             // Check that the data is in range
             part_t* part = (part_t*)arg->data;
@@ -317,19 +309,6 @@ int argcheck()
         printf("%s: required argument missing\n", progname);
         return -1;
     }
-    // Now check that all partitions are in range
-    for(int i = ARG_PARTS; i < (ARG_PARTS + partmax); ++i)
-    {
-        arg_t* arg = &args[argtable[i - 1]];
-        assert(arg->type);
-        assert(arg->data);
-        part_t* part = (part_t*)arg->data;
-        if((part->start + part->size) > filesz)
-        {
-            printf("%s: partition %d is not in range\n", progname, i - ARG_PARTS);
-            return -1;
-        }
-    }
     return 0;
 }
 
@@ -347,32 +326,62 @@ arg_t* argget(int argid)
     return arg;
 }
 
+// Gets the program name
+char* getprogname()
+{
+    return progname;
+}
+
+// Gets the number of partitions
+int getnumparts()
+{
+    return partmax;
+}
+
+// Cleans up the program
+void cleanup()
+{
+    // Free up argument memory
+    for(int i = 0; i < partmax; ++i)
+    {
+        int idx = argtable[(ARG_PARTS - 1) + i];
+        uintptr_t addr = args[idx].data;
+        free((void*)addr);
+    }
+    free((void*)args);
+}
+
 int main(int argc, char** argv)
 {
+    setlocale(LC_ALL, "C");
     progname = basename(argv[0]);
     // Parse the arguments passed to us
     if(argparse(argc, argv))
         return 1;
     if(argcheck())
+    {
+        cleanup();
         return 1;
+    }
 
     // Prepare the disk image
     if(diskinit())
+    {
+        cleanup();
         return 1;
+    }
 
-    for(int i = 0; i < (ARG_PARTS + (partmax - 1)); ++i)
+    // Create the partitions
+    if(partcreate())
     {
-        arg_t* arg = &args[argtable[i]];
-        printf("%d %d %d\n", i, argtable[i], arg->type);
+        diskrelease();
+        cleanup();
+        return 1;
     }
-    // Free up argument memory
-    for(int i = 0; i < PARTMAX; ++i)
-    {
-        int idx = argtable[(ARG_PARTS - 1) + i];
-        uintptr_t addr = args[idx].data;
-        if(addr)
-            free((void*)addr);
-    }
-    free((void*)args);
+
+    // Close the disk file
+    diskrelease();
+    // Frees the partition table data
+    partfree();
     return 0;
 }
