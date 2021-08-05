@@ -1,13 +1,8 @@
 *.code-workspace
+fw
 rootdir
 .vscode
 cross
-deps
-*.img
-bochs.txt
-bochs.log
-patch
+images
 build-*
-gmon.out
-prof.txt
 .VSCodeCounter

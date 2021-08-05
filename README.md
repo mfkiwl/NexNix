@@ -7,5 +7,5 @@ I have constantly gone back and forth between monolithic and microkernels. In th
 Here are the main abstract goals:<br>
 Security - NexNix will be secure above all else. This involves a capbility based model, with ACLs on files. User security will be tight, and the kernel will be very stringent<br>
 Performance - NexNix will be as fast as possible. This will involve using optimal algorithms throughout the kernel. Effecient algorithms will be chosen over simpler, subpar ones<br>
-Portability - NexNix must be able to run on old, 386 based machines as well as high end servers. It should also take advantage of the hardware features of modern systems, though it won't depend on them<br>
+Portability - NexNix must be able to run on a large variety of systems. It should also take advantage of the hardware features of modern systems, though it won't depend on them<br>
 Simplicity - Within the above constraints, NexNix should abide by the UNIX philosophy of simplicity as much as possible
