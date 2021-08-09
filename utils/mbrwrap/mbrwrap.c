@@ -73,14 +73,14 @@ int main(int argc, char** argv)
     }
     // Read in the MBR
     mbr_t mbr;
-    assert(sizeof(mbr_t) == SECTSZ);
     read(imgfd, &mbr, sizeof(mbr_t));
-    memset(&mbr.parts[1].chsstart, 0xFF, 3);            // Set default CHS values
-    memset(&mbr.parts[1].chsend, 0xFF, 3);
-    mbr.parts[1].flags = 0x80;                          // Set active bit
-    mbr.parts[1].type = 0x0C;                           // Win95 LBA type
-    mbr.parts[1].lbastart = ((base * 1048576) / 512);   // Set base (in sectors)
-    mbr.parts[1].lbasize = ((size * 1048576) / 512);    // Set LBA end
+    memcpy(&mbr.parts[1], &mbr.parts[0], sizeof(mbrpart_t));
+    memset(&mbr.parts[0].chsstart, 0xFF, 3);            // Set default CHS values
+    memset(&mbr.parts[0].chsend, 0xFF, 3);
+    mbr.parts[0].flags = 0x0;
+    mbr.parts[0].type = 0x0C;                           // Win95 LBA type
+    mbr.parts[0].lbastart = ((base * 1048576) / 512);   // Set base (in sectors)
+    mbr.parts[0].lbasize = ((size * 1048576) / 512);    // Set LBA end
     // Write it out
     lseek(imgfd, 0, SEEK_SET);
     write(imgfd, &mbr, sizeof(mbr_t));

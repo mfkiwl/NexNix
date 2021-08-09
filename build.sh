@@ -51,6 +51,7 @@ Below are valid options which can be passed to $(basename $0)
     -D "PARAMS" - contains configuration overrides. This allows for users to override the default configuration in nexnix.conf
     -d - specifies that we are in debug mode
     -P - specifies that profiling is to be enabled. This should be used with -d for optimal resuslts
+    -u - specifies users to chown disk images to
 end
     exit 0
 }
@@ -58,7 +59,7 @@ end
 # Parses data in the GLOBAL_ARGS variable
 argparse()
 {
-    arglist="A:hj:i:p:a:dD:P"
+    arglist="A:hj:i:p:a:dD:Pu:"
     # Start the loop
     while getopts $arglist arg $GLOBAL_ARGS > /dev/null 2> /dev/null; do
         case ${arg} in
@@ -94,6 +95,9 @@ argparse()
                 ;;
             "P")
                 export GLOBAL_PROFILE=1
+                ;;
+            "u")
+                export GLOBAL_USER="$OPTARG"
                 ;;
             "?")
                 panic "invalid argument sent"
@@ -175,6 +179,10 @@ sanitycheck()
         then
             panic "image must be sent"
         fi
+        if [ -z "$GLOBAL_USER" ]
+        then
+            panic "user must be sent"
+        fi
     fi
     # Now check common stuff
     if [ ! -z "$GLOBAL_JOBCOUNT" ]
@@ -187,13 +195,13 @@ sanitycheck()
         fi
     fi
     # Check the prefix
-    if [ -z "$GLOBAL_PREFIX" ]
+    if [ -z "$GLOBAL_PREFIX" ] && [ "$GLOBAL_ACTION" != "dep" ]
     then
         panic "prefix must be set"
     fi
     # Check that is absolute
     isabs=$(echo "$GLOBAL_PREFIX" | awk '$0 ~ /^\// { print $0 }')
-    if [ -z "$isabs" ]
+    if [ -z "$isabs" ] && [ "$GLOBAL_ACTION" != "dep" ]
     then
         panic "prefix must be absolute"
     fi
@@ -224,27 +232,30 @@ build()
     # Create the prefix
     if [ -d $GLOBAL_PREFIX ]
     then
-        rm -r $GLOBAL_PREFIX
+        rm -rf $GLOBAL_PREFIX
     fi
     mkdir -p $GLOBAL_PREFIX
     # Install the headers
     mkdir -p $GLOBAL_PREFIX/usr/include
     cp -r $PWD/usr/include/* $GLOBAL_PREFIX/usr/include
+    # Build nexboot first
+    ./boot/buildnb.sh
     # Run Ninja in build directory
     cd build-${GLOBAL_ARCH}
     ninja install -j$GLOBAL_JOBCOUNT
-    checkerr $? "build failed"
+    checkerror $? "build failed"
 }
 
 # Configure Ninja
 cmakerun()
 {
     # Create the build directory
-    mkdir build-${GLOBAL_ARCH}
+    mkdir build-${GLOBAL_ARCH} > /dev/null 2>&1
     checkerror $? "CMake already configured"
     cd build-${GLOBAL_ARCH}
     # Run CMake. We use eval to resolve variables in GLOBAL_CMAKEVARS
-    eval cmake .. "$GLOBAL_CMAKEVARS"
+    eval cmake .. "$GLOBAL_CMAKEVARS" -DCMAKE_TOOLCHAIN_FILE=$PWD/../scripts/toolchain.cmake \
+        -DCMAKE_INSTALL_PREFIX=$GLOBAL_PREFIX
     checkerror $? "configuring CMake failed"
 }
 
@@ -273,57 +284,51 @@ main()
     # Split it up
     export GLOBAL_MACH=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $1 }')
     export GLOBAL_BOARD=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $2 }')
+    GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DGLOBAL_MACH=\"$GLOBAL_MACH\" \
+-DGLOBAL_BOARD=\"$GLOBAL_BOARD\""
     # Run based on action now
     if [ "$GLOBAL_ACTION" = "dep" ]
     then
         # Build the toolchain
         bash dep/builddep.sh
-        # Build the dependencies
-        if [ ! -d build-utils ]
-        then
-            mkdir build-utils
-        fi
-        cd build-utils
-        cmake ../utils -DDEBUG=$GLOBAL_DEBUG -DCMAKE_INSTALL_PREFIX=$GLOBAL_PREFIX -G"Ninja"
-        ninja install -j $GLOBAL_JOBCOUNT
+        # Build host utilities
+        mkdir build-utils && cd build-utils
+        cmake ../utils -DCMAKE_INSTALL_PREFIX=$PWD/../utilsbin -G"Ninja"
+        ninja install -j$GLOBAL_JOBCOUNT
     elif [ "$GLOBAL_ACTION" = "configure" ]
     then
+        # Set the debug variable
+        if [ "$GLOBAL_DEBUG" = "1" ]
+        then
+            GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DCMAKE_BUILD_TYPE=\"Debug\""
+        else
+            GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DCMAKE_BUILD_TYPE=\"Release\""
+        fi
         # Run CMake
         cmakerun
     elif [ "$GLOBAL_ACTION" = "image" ]
     then
         if [ ! -d $GLOBAL_IMAGE ]
         then
-            mkdir $GLOBAL_IMAGE
+            mkdir -p $GLOBAL_IMAGE
         fi
         # Generate images based on arch and baord
         if [ "$GLOBAL_BOARD" = "pc" ] || [ "$GLOBAL_BOARD" = "virtio" ]
         then
             # Create the disk image
-            ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -t gpt -d rootdir \
-                                -p1,10,esp,/boot -p11,2047,ext2,/fsroot
-            # Create the ISO image
-            ./scripts/image.sh -s 1024 -i $GLOBAL_IMAGE/nncd.iso -t iso -d rootdir \
-                                -p1,10,esp,/boot -p11,1023,ext2,/fsroot
+            ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -d $GLOBAL_PREFIX \
+                               -p1,300,esp,/boot -p301,2047,ext2,/fsroot -u $GLOBAL_USER
         elif [ "$GLOBAL_BOARD" = "raspi3" ]
         then
             # Copy Raspi3 EFI files
-            cp -r fw/raspi3-efi/* rootdir/boot/
+            cp -r fw/raspi3-efi/* $GLOBAL_PREFIX/boot/
+            # Change ownership of those copied files
+            chown $GLOBAL_USER $GLOBAL_PREFIX/boot/*
             # Create the image
-            ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -t gpt -d rootdir \
-                                -p1,10,esp,/boot -p11,2047,ext2,/fsroot
-            # Wrap up the ESP into an MBR active partition
-            ./rootdir/utils/mbrwrap $GLOBAL_IMAGE/nndisk.img 1 10
-            # Remove Raspi3 EFI files
-            rm -r rootdir/boot/firmware/*
-            rmdir rootdir/boot/firmware
-            rm rootdir/boot/*.dtb
-            rm rootdir/boot/*.txt
-            rm rootdir/boot/*.bin
-            rm rootdir/boot/*.dat
-            rm rootdir/boot/*.md
-            rm rootdir/boot/*.fd
-            rm rootdir/boot/*.elf
+            ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -d $GLOBAL_PREFIX \
+                                -p1,300,esp,/boot -p301,2047,ext2,/fsroot -u $GLOBAL_USER
+            # Make ESP usable by RPi
+            ./utilsbin/mbrwrap $GLOBAL_IMAGE/nndisk.img 1 300
         fi
     elif [ "$GLOBAL_ACTION" = "build" ]
     then
@@ -331,6 +336,9 @@ main()
     elif [ "$GLOBAL_ACTION" = "clean" ]
     then
         rm -rf build-*
+        rm -rf images-*
+        rm -rf rootdir-*
+        rm -rf fw/edk2/Build
     fi
 }
 

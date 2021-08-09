@@ -47,7 +47,7 @@ printdep()
     echo "A nearly POSIX compliant shell, bash (for building the toolchain), \
 GNU make (for building the toolchain), perl, texinfo, system build utilites (gcc, make, etc) \
 cmake, tar, flex, bison, gettext, wget, kpartx, mkfs.ext2, git, \
-aarch64 GCC, riscv64 GCC, GNU parted, acpica-tools, nasm, DD, python3, and the ninja build system"
+aarch64 GCC, GNU parted, acpica-tools, nasm, DD, python3, and the ninja build system"
 }
 
 # Checks one individual dependency
@@ -86,7 +86,6 @@ builddep()
     checkdep parted
     checkdep git
     checkdep aarch64-linux-gnu-gcc
-    checkdep riscv64-linux-gnu-gcc
     checkdep iasl
     checkdep python
     checkdep nasm
@@ -282,52 +281,28 @@ buildedk2()
     fi
     cd fw
     rm -rf edk2
-    if [ "$GLOBAL_ARCH" != "aarch64-raspi3" -a "$GLOBAL_MACH" != "riscv64" ]
-    then
-        echo -n "Downloading EDK2..."
-        git clone https://github.com/tianocore/edk2.git -b"stable/202011" \
-                                                            > build.log 2> builderr.log
-        checkerr $? "EDK2 download failed"
-        cd edk2 && git submodule update --init > build.log 2> builderr.log
-        checkerr $? "EDK2 download failed"
-        echo "ok"
-    fi
-    if [ "$GLOBAL_MACH" != "riscv64" ] && [ "$GLOBAL_ARCH" != "aarch64-raspi3" ] 
+    echo -n "Downloading EDK2..."
+    git clone https://github.com/tianocore/edk2.git -b"stable/202011" \
+                                                        > build.log 2> builderr.log
+    checkerr $? "EDK2 download failed"
+    cd edk2 && git submodule update --init > build.log 2> builderr.log
+    checkerr $? "EDK2 download failed"
+    # Patch EDK2
+    patch -p0 -f < ../dep/edk2.patch > /dev/null 2>/dev/null
+    echo "ok"
+    if [ "$GLOBAL_ARCH" != "aarch64-raspi3" ] 
     then
         echo -n "Building EDK2..."
         export EDK_TOOLS_PATH=$PWD/BaseTools
     fi
     # Build it now
-    if [ "$GLOBAL_MACH" = "riscv64" ]
-    then
-        # We build U-Boot for RISC-V
-        echo -n "Downloading U-Boot..."
-        wget https://github.com/u-boot/u-boot/archive/refs/tags/v2021.07.tar.gz \
-            > /dev/null 2>&1
-            checkerr $? "download failed"
-        mv v2021.07.tar.gz uboot.tar.gz
-        echo "ok"
-        echo -n "Extracting U-Boot..."
-        tar xf uboot.tar.gz
-        echo "ok"
-        echo -n "Building U-Boot..."
-        cd u-boot-2021.07
-        export CROSS_COMPILE=riscv64-linux-gnu-
-        make qemu-riscv64_defconfig > /dev/null 2>&1
-        checkerr $? "build failed"
-        make -j $GLOBAL_JOBCOUNT > /dev/null 2>&1
-        checkerr $? "build failed"
-        echo "ok"
-        echo -n "Installing U-Boot..."
-        cp u-boot.bin ../EFI_${GLOBAL_ARCH}.fd
-        echo "ok"
-    elif [ "$GLOBAL_MACH" = "x86_64" ]
+    if [ "$GLOBAL_MACH" = "x86_64" ]
     then
         . $PWD/edksetup.sh > build.log 2> builderr.log
         checkerr $? "EDK2 build failed"
         make -C BaseTools > build.log 2> builderr.log
         checkerr $? "EDK2 build failed"
-        build -a X64 -t GCC5 -p OvmfPkg/OvmfPkgX64.dsc -n$GLOBAL_JOBCOUNT > build.log 2> builderr.log
+        build -a X64 -t GCC5 -p OvmfPkg/OvmfPkgX64.dsc -n $GLOBAL_JOBCOUNT > build.log 2> builderr.log
         checkerr $? "EDK2 build failed"
         echo "ok"
         echo -n "Installing EDK2..."
@@ -340,7 +315,7 @@ buildedk2()
         checkerr $? "EDK2 build failed"
         make -C BaseTools > build.log 2> builderr.log
         checkerr $? "EDK2 build failed"
-        build -a IA32 -t GCC5 -p OvmfPkg/OvmfPkgIA32.dsc -n$GLOBAL_JOBCOUNT > build.log 2> builderr.log
+        build -a IA32 -t GCC5 -p OvmfPkg/OvmfPkgIA32.dsc -n $GLOBAL_JOBCOUNT > build.log 2> builderr.log
         checkerr $? "EDK2 build failed"
         echo "ok"
         echo -n "Installing EDK2..."
@@ -354,7 +329,7 @@ buildedk2()
         checkerr $? "EDK2 build failed"
         make -C BaseTools > build.log 2> builderr.log
         checkerr $? "EDK2 build failed"
-        build -a AARCH64 -t GCC5 -p ArmVirtPkg/ArmVirtQemu.dsc -n$GLOBAL_JOBCOUNT > build.log 2> builderr.log
+        build -a AARCH64 -t GCC5 -p ArmVirtPkg/ArmVirtQemu.dsc -n $GLOBAL_JOBCOUNT > build.log 2> builderr.log
         checkerr $? "EDK2 build failed"
         echo "ok"
         echo -n "Installing EDK2..."

@@ -1,8 +1,10 @@
 *.code-workspace
 fw
-rootdir
+rootdir-*
+*.img
+utilsbin
 .vscode
 cross
-images
+images-*
 build-*
 .VSCodeCounter

@@ -10,8 +10,9 @@ size=
 type=
 dir=
 parts=()
-types="gpt iso"
 fstypes="ext2 fat32 esp"
+user=
+hashybrid=0
 
 # Checks if an error occured, and panics if one did
 checkerr()
@@ -25,7 +26,7 @@ checkerr()
 
 argparse()
 {
-    arglist="p:s:i:t:d:"
+    arglist="p:s:i:d:u:"
     # Read them in
     while getopts $arglist arg $args > /dev/null 2> /dev/null; do
         case ${arg} in
@@ -38,20 +39,6 @@ argparse()
             "i")
                 image=$OPTARG
                 ;;
-            "t")
-                # Validate it
-                for curtype in $types; do
-                    if [ "$curtype" = "$OPTARG" ]
-                    then
-                        type=$curtype
-                    fi
-                done
-                if [ -z "$type" ]
-                then
-                    echo "$0: invalid partition table type"
-                    exit 1
-                fi
-                ;;
             "d")
                 # Check that is exists
                 if [ ! -d $OPTARG ]
@@ -60,6 +47,9 @@ argparse()
                     exit 1
                 fi
                 dir=$OPTARG
+                ;;
+            "u")
+                user=$OPTARG
                 ;;
             "?")
                 echo "$0: unrecognized argument"
@@ -90,15 +80,15 @@ checkarg()
         exit 1
     fi
 
-    if [ -z "$type" ]
-    then
-        echo "$0: partition table type not specified"
-        exit 1
-    fi
-
     if [ -z "$dir" ]
     then
         echo "$0: input directory not specified"
+        exit 1
+    fi
+
+    if [ -z "$user" ]
+    then
+        echo "$0: user not specified"
         exit 1
     fi
 }
@@ -106,7 +96,7 @@ checkarg()
 partimg()
 {
     # First create a partition table 
-    parted -s $image "mktable gpt"
+    parted -s $image "mklabel gpt"
     checkerr $? "unable to create partition table"
     # Loop through every partition
     index=0
@@ -191,9 +181,9 @@ partimg()
         checkerr $? "adding partition failed"
         dev=$(echo "$dev" | awk -vline=$((index+1)) '$FNR == $line { print $3 }')
         # Format it
-        if [ "$fstype" = "fat32" ] || [ "$fstype" = "esp" ]
+        if [ "$fstype" = "fat32" ] || [ "$fstype" = "esp" ] || [ "$fstype" = "hybrid" ]
         then
-            mkdosfs -F32 /dev/mapper/$dev > /dev/null 2>&1
+            mkfs.vfat /dev/mapper/$dev > /dev/null 2>&1
         elif [ "$fstype" = "ext2" ]
         then
             mke2fs /dev/mapper/$dev > /dev/null 2>&1
@@ -201,7 +191,9 @@ partimg()
         # Copy over the needed data to this partitionS
         mkdir fs
         mount /dev/mapper/$dev fs
+        sleep 1
         cp -r ${dir}${dirprefix}/* fs/
+        sleep 1
         # Now we can cleanup
         umount fs
         kpartx -d $image > /dev/null 2>&1
@@ -218,30 +210,17 @@ main()
     # Verfiy the arguments
     checkarg
     # Create the disk image
-    if [ "$type" = "iso" ]
+    if [ ! -f $image ]
     then
-        dd if=/dev/zero of=tmp.img bs=1M count=$size > /dev/null 2>&1
-        checkerr $? "disk image creation failed"
-    else
         dd if=/dev/zero of=$image bs=1M count=$size > /dev/null 2>&1
         checkerr $? "disk image creation failed"
     fi
 
     # Partition the disk image
-    if [ "$type" = "iso" ]
-    then
-        isoimage=$image
-        image=tmp.img
-    fi
     partimg $image
-    # If we are building the ISO image, run xorriso now
-    if [ "$type" = "iso" ]
-    then
-        rm -f $isoimage
-        xorriso -as mkisofs -o $isoimage -iso-level 3 -V NexNix ./$image -e $image -no-emul-boot \
-            >/dev/null 2>&1
-        rm tmp.img
-    fi
+    # Change ownership to caller
+    chown $user $image
+    chown $user $(dirname $image)
 }
 
 # Launch the main part of the script

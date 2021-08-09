@@ -7,4 +7,4 @@ project(mbrwrap VERSION 0.0.1)
 enable_language(C)
 
 add_executable(mbrwrap mbrwrap.c)
-install(TARGETS mbrwrap DESTINATION utils)
+install(TARGETS mbrwrap DESTINATION .)
