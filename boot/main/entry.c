@@ -4,12 +4,19 @@
     See LICENSE
 */
 
-#include <Uefi.h>
-#include <Library/UefiLib.h>
+#include <boot/nexboot.h>
 
 // Main entry point for nexboot (and NexNix for that matter)
-EFI_STATUS EFIAPI nb_main(EFI_HANDLE handle, EFI_SYSTEM_TABLE* systab)
+EFI_STATUS EFIAPI nb_main(EFI_HANDLE img, EFI_SYSTEM_TABLE* systab)
 {
-    Print(L"Hello, world\n");
-    return EFI_SUCCESS;
+    // Set up UEFI wrapper and EDK2
+    efi_init(img, systab);
+    CHAR16 key = 0;
+    efi_readkey(NULL, &key);
+    if(key == L'l')
+        gST->ConOut->OutputString(gST->ConOut, L"got here\r\n");
+    efi_stall(2000);
+    efi_exit();
+    for(;;);
+    return EFI_NOT_READY;
 }

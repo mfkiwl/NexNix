@@ -12,6 +12,7 @@
 
 [Sources]
   ../main/entry.c
+  ../main/efilib.c
 
 [Packages]
   MdePkg/MdePkg.dec
@@ -29,3 +30,6 @@
 [FeaturePcd]
 
 [Pcd]
+
+[BuildOptions]
+  *_GCC5_*_CC_FLAGS = -I$(PWD)/../../../../../../../../../usr/include

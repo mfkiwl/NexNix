@@ -24,6 +24,11 @@ fi
 # Now we run build
 export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
 build -a $EDK2ARCH -p MdeModulePkg/MdeModulePkg.dsc -t GCC5 -n $GLOBAL_JOBCOUNT
+if [ $? -ne 0 ]
+then
+    echo "$0: unable to build nexboot"
+    exit 1
+fi
 
 # Install it to the system root
 if [ ! -d $GLOBAL_PREFIX/boot/EFI/BOOT ]

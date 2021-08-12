@@ -240,6 +240,7 @@ build()
     cp -r $PWD/usr/include/* $GLOBAL_PREFIX/usr/include
     # Build nexboot first
     ./boot/buildnb.sh
+    checkerror $? "build failed"
     # Run Ninja in build directory
     cd build-${GLOBAL_ARCH}
     ninja install -j$GLOBAL_JOBCOUNT
