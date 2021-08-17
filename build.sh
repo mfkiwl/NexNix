@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Base variables
+export GLOBAL_ACTIONS="clean dep image configure build"
+export GLOBAL_JOBCOUNT=1
+export GLOBAL_ARCHS="x86_64-pc i686-pc aarch64-sr"
+export GLOBAL_CROSS="$PWD/cross"
+
 # Helper functions
 # Prints out an error message
 panic()
@@ -178,18 +184,14 @@ sanitycheck()
         panic "invalid action set"
     fi
     # Now diverge based on action
-    if [ "$GLOBAL_ACTION" = "clean" ]
-    then
-        # Exit now, we have all we need
-        return
-    elif [ "$GLOBAL_ACTION" = "image" ]
+    if [ "$GLOBAL_ACTION" = "image" ] || [ "$GLOBAL_ACTION" = "clean" ]
     then
         # Check everything image specific
         if [ -z "$GLOBAL_IMAGE" ]
         then
             panic "image must be sent"
         fi
-        if [ -z "$GLOBAL_USER" ]
+        if [ -z "$GLOBAL_USER" ] && [ "$GLOBAL_ACTION" = "image" ]
         then
             panic "user must be sent"
         fi
@@ -214,6 +216,11 @@ sanitycheck()
     if [ -z "$isabs" ] && [ "$GLOBAL_ACTION" != "dep" ]
     then
         panic "prefix must be absolute"
+    fi
+    # Clean action now returns
+    if [ "$GLOBAL_ACTION" = "clean" ]
+    then
+        return
     fi
     # Else, check the architecture
     if [ -z "$GLOBAL_ARCH" ] || [ -z "$GLOBAL_ARCHS" ]
@@ -265,8 +272,8 @@ cmakerun()
     checkerror $? "CMake already configured"
     cd build-${GLOBAL_ARCH}
     # Run CMake. We use eval to resolve variables in GLOBAL_CMAKEVARS
-    eval cmake .. "$GLOBAL_CMAKEVARS" -DCMAKE_TOOLCHAIN_FILE=$PWD/../scripts/toolchain.cmake \
-        -DCMAKE_INSTALL_PREFIX=$GLOBAL_PREFIX
+    eval cmake .. -G"Ninja" -DCMAKE_INSTALL_PREFIX=$GLOBAL_PREFIX $GLOBAL_CMAKEVARS \
+                -DCMAKE_TOOLCHAIN_FILE="$PWD/../scripts/toolchain.cmake"
     checkerror $? "configuring CMake failed"
 }
 
@@ -282,32 +289,44 @@ main()
     fi
     # Grab the arguments passed to us
     GLOBAL_ARGS="$@"
-    # Parse args, as some configuration file parameters depend on this
-    argparse
-    # Source the configuration file / script
-    . $PWD/scripts/config.sh
-    # Parse the arguments again to override the configuration file
+    # Parse args
     argparse
     # Now we must parse user specified settings overrides
     urideparse
     # Check that it is all valid
     sanitycheck
-    # Split it up
+    # Source the configuration script
+    if [ "$GLOBAL_ACTION" != "dep" ] && [ "$GLOBAL_ACTION" != "configure" ] && [ "$GLOBAL_ACTION" != "clean" ]
+    then
+        . $PWD/config/config-$GLOBAL_ARCH.sh
+    fi
+    # Split up the architecture into machine and board
     export GLOBAL_MACH=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $1 }')
     export GLOBAL_BOARD=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $2 }')
     GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DGLOBAL_MACH=\"$GLOBAL_MACH\" \
--DGLOBAL_BOARD=\"$GLOBAL_BOARD\""
+-DGLOBAL_BOARD=\"$GLOBAL_BOARD\" -DGLOBAL_CROSS=\"$GLOBAL_CROSS\""
     # Run based on action now
     if [ "$GLOBAL_ACTION" = "dep" ]
     then
         # Build the toolchain
         bash dep/builddep.sh
         # Build host utilities
-        mkdir build-utils && cd build-utils
+        if [ ! -d build-utils ]
+        then
+            mkdir build-utils
+        fi
+        cd build-utils
         cmake ../utils -DCMAKE_INSTALL_PREFIX=$PWD/../utilsbin -G"Ninja"
         ninja install -j$GLOBAL_JOBCOUNT
     elif [ "$GLOBAL_ACTION" = "configure" ]
     then
+        if [ ! -d $PWD/config ]
+        then
+            mkdir $PWD/config
+        fi
+        # Generate the configuration script
+        ./utilsbin/confgen scripts/nexnix.cfg config/config-$GLOBAL_ARCH.sh
+        . $PWD/config/config-$GLOBAL_ARCH.sh
         # Set the debug variable
         if [ "$GLOBAL_DEBUG" = "1" ]
         then
@@ -323,22 +342,12 @@ main()
         then
             mkdir -p $GLOBAL_IMAGE
         fi
-        # Generate images based on arch and baord
-        if [ "$GLOBAL_BOARD" = "pc" ] || [ "$GLOBAL_BOARD" = "virtio" ]
+        # Create the disk image
+        ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -d $GLOBAL_PREFIX \
+                           -p1,300,esp,/boot -p301,2047,ext2,/fsroot -u $GLOBAL_USER
+        if [ "$GLOBAL_BOARD" = "sr" ]
         then
-            # Create the disk image
-            ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -d $GLOBAL_PREFIX \
-                               -p1,300,esp,/boot -p301,2047,ext2,/fsroot -u $GLOBAL_USER
-        elif [ "$GLOBAL_BOARD" = "raspi3" ]
-        then
-            # Copy Raspi3 EFI files
-            cp -r fw/raspi3-efi/* $GLOBAL_PREFIX/boot/
-            # Change ownership of those copied files
-            chown $GLOBAL_USER $GLOBAL_PREFIX/boot/*
-            # Create the image
-            ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -d $GLOBAL_PREFIX \
-                                -p1,300,esp,/boot -p301,2047,ext2,/fsroot -u $GLOBAL_USER
-            # Make ESP usable by RPi
+            # Make ESP usable by ARM firmware that isn't aware of GPT
             ./utilsbin/mbrwrap $GLOBAL_IMAGE/nndisk.img 1 300
         fi
     elif [ "$GLOBAL_ACTION" = "build" ]
@@ -347,9 +356,10 @@ main()
     elif [ "$GLOBAL_ACTION" = "clean" ]
     then
         rm -rf build-*
-        rm -rf images-*
-        rm -rf rootdir-*
+        rm -rf ${GLOBAL_IMAGE}-*
+        rm -rf ${GLOBAL_PREFIX}-*
         rm -rf fw/edk2/Build
+        rm -rf config
     fi
 }
 

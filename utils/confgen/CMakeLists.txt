@@ -1,4 +1,4 @@
-# CMakeLists.txt - contains CMake stuff for host utilities
+# CMakeLists.txt - contains CMake build for confgen utility
 # Copyright 2021 Jedidiah Thompson
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +13,14 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
-project(utils VERSION 0.0.1)
+project(confgen VERSION 0.0.1)
+
+set(CMAKE_C_STANDARD 11)
 enable_language(C)
 
-add_subdirectory(mbrwrap)
-add_subdirectory(confgen)
+set(CMAKE_C_FLAGS "-O3 -DNDEBUG")
+
+add_executable(confgen confgen.c)
+install(TARGETS confgen DESTINATION .)
+
+

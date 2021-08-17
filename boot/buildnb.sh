@@ -45,7 +45,7 @@ if [ ! -d $GLOBAL_PREFIX/boot/EFI/BOOT ]
 then
     mkdir -p $GLOBAL_PREFIX/boot/EFI/BOOT
 fi
-# Change AArch64 EDK2ARCH to AA64
+# Change an AArch64 EDK2ARCH to AA64
 if [ "$EDK2ARCH" = "AARCH64" ]
 then
     FILEARCH=AA64

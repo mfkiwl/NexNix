@@ -3,6 +3,8 @@ fw
 rootdir-*
 *.img
 utilsbin
+fs
+config
 .vscode
 cross
 images-*

@@ -17,8 +17,9 @@
 
 #include <boot/nexboot.h>
 
-// Keyboard protocols
+// Keyboard protocol
 EFI_SIMPLE_TEXT_INPUT_PROTOCOL* keyprot = NULL;
+EFI_GUID textguid = EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
 
 // Initializes EFI data structures
 void efi_init(EFI_HANDLE img, EFI_SYSTEM_TABLE* systab)
@@ -80,7 +81,7 @@ void efi_panicearly(CHAR16* msg)
     gST->ConOut->OutputString(gST->ConOut, L"nexboot panic: ");
     // Print out the message, wait for a few seconds, then exit
     gST->ConOut->OutputString(gST->ConOut, msg);
-    efi_stall(NB_PANICDELAY);
+    efi_stall(NEXBOOT_PANICDELAY);
     gBS->Exit(gImageHandle, EFI_NOT_READY, 0, NULL);
 }
 
@@ -91,7 +92,6 @@ void efi_readkey(UINT16* scan, CHAR16* keychar)
     if(!keyprot)
     {
         // Grab the simple text input protocol
-        EFI_GUID textguid = EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
         EFI_STATUS status = gBS->LocateProtocol(&textguid, NULL, (VOID**)&keyprot);
         if(EFI_ERROR(status))
             efi_panicearly(L"unable to open text protocol\r\n");
@@ -112,4 +112,10 @@ void efi_readkey(UINT16* scan, CHAR16* keychar)
 void efi_exit()
 {
     gBS->Exit(gImageHandle, EFI_NOT_READY, 0, NULL);
+}
+
+// Print something out to EFI default console
+void efi_printearly(CHAR16* str)
+{
+    gST->ConOut->OutputString(gST->ConOut, str);
 }

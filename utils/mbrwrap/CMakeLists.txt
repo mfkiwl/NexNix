@@ -14,6 +14,9 @@
 
 cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
 project(mbrwrap VERSION 0.0.1)
+
+set(CMAKE_C_STANDARD 11)
+
 enable_language(C)
 
 add_executable(mbrwrap mbrwrap.c)

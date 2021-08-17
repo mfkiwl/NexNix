@@ -1,4 +1,4 @@
-# nbia32.inf - contains IA32 nexboot build file
+# CMakeLists.txt - contains CMake stuff for nexboot
 # Copyright 2021 Jedidiah Thompson
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,34 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[Defines]
-  INF_VERSION = 1.25
-  BASE_NAME = nexboot
-  FILE_GUID = d34a803e-3267-4567-9965-b32b4de60a9e
-  MODULE_TYPE = UEFI_APPLICATION
-  VERSION_STRING = 1.0
-  ENTRY_POINT = nb_main
-
-[Sources]
-  ../main/entry.c
-  ../main/efilib.c
-
-[Packages]
-  MdePkg/MdePkg.dec
-
-[LibraryClasses]
-  UefiApplicationEntryPoint
-  UefiLib
-
-[Guids]
-
-[Ppis]
-
-[Protocols]
-
-[FeaturePcd]
-
-[Pcd]
-
-[BuildOptions]
-  *_GCC5_*_CC_FLAGS = -I$(PWD)/../../../../../../../../../usr/include
+cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
+project(nexboot VERSION 0.0.1)
+enable_language(C ASM)

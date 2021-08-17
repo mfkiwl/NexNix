@@ -332,7 +332,7 @@ buildedk2()
         cp Build/OvmfIa32/DEBUG_GCC5/FV/OVMF_CODE.fd ../EFI_${GLOBAL_ARCH}.fd
         cp Build/OvmfIa32/DEBUG_GCC5/FV/OVMF_VARS.fd ../EFI_${GLOBAL_ARCH}_VARS.fd
         echo "ok"
-    elif [ "$GLOBAL_ARCH" = "aarch64-virtio" ]
+    elif [ "$GLOBAL_ARCH" = "aarch64-sr" ]
     then
         export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
         . $PWD/edksetup.sh > build.log 2> builderr.log
@@ -345,19 +345,6 @@ buildedk2()
         echo -n "Installing EDK2..."
         cp Build/ArmVirtQemu-AARCH64/DEBUG_GCC5/FV/QEMU_EFI.fd ../EFI_${GLOBAL_ARCH}.fd
         cp Build/ArmVirtQemu-AARCH64/DEBUG_GCC5/FV/QEMU_VARS.fd ../EFI_${GLOBAL_ARCH}_VARS.fd
-        echo "ok"
-    elif [ "$GLOBAL_ARCH" = "aarch64-raspi3" ]
-    then
-        echo -n "Installing EDK2..."
-        # Download Raspi3 EFI images
-        rm -f RPi3_UEFI_Firmware_v1.35.zip
-        rm -rf raspi3-efi
-        wget https://github.com/pftf/RPi3/releases/download/v1.35/RPi3_UEFI_Firmware_v1.35.zip \
-                > /dev/null 2>&1
-        mkdir raspi3-efi
-        cd raspi3-efi
-        unzip ../RPi3_UEFI_Firmware_v1.35.zip > /dev/null 2>&1
-        cp RPI_EFI.fd ../EFI_${GLOBAL_ARCH}.fd
         echo "ok"
     fi
 }
