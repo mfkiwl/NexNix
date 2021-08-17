@@ -30,7 +30,7 @@ then
 fi
 
 # Check if we need to configure it
-if [ ! -d $PWD/build-$arch ]
+if [ ! -d $PWD/build-$arch ] && [ "$RECONFIGURE" != "1" ]
 then
     ./build.sh -a$arch -Aconfigure -p$PWD/rootdir-$arch -d -j$(nproc)
     checkerr $? "unable to configure NexNix"
@@ -38,7 +38,7 @@ fi
 
 # Build it
 ./build.sh -a$arch -Abuild -p$PWD/rootdir-$arch -j$(nproc)
-#checkerr $? "unable to build NexNix"
+checkerr $? "unable to build NexNix"
 
 # Create the images(s)
 sudo ./build.sh -a$arch -Aimage -i$PWD/images-$arch -p$PWD/rootdir-$arch -u$(whoami)

@@ -13,5 +13,6 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
-project(nexboot VERSION 0.0.1)
-enable_language(C ASM)
+
+# Build the BIOS bootloader
+add_subdirectory(mach/bios)

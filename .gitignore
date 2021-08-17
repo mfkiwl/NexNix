@@ -5,6 +5,7 @@ rootdir-*
 utilsbin
 fs
 config
+config-*.h
 .vscode
 cross
 images-*

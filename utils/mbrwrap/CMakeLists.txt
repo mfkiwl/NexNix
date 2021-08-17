@@ -13,7 +13,7 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
-project(mbrwrap VERSION 0.0.1)
+project(mbrwrap)
 
 set(CMAKE_C_STANDARD 11)
 

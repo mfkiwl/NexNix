@@ -28,7 +28,7 @@
 
 char* progname = NULL;
 
-void parsefile(FILE* src, FILE* dest);
+void parsefile(FILE* src, FILE* dest, FILE* hdr);
 
 // Makes the program exit
 void panic(char* str, ...)
@@ -43,7 +43,7 @@ void panic(char* str, ...)
     printf("\r\n");
 }
 
-int runsubprojects(char* title, FILE* dest)
+int runsubprojects(char* title, FILE* dest, FILE* hdr)
 {
     if(!title)
         return 0;
@@ -82,13 +82,13 @@ int runsubprojects(char* title, FILE* dest)
             return 1;
         }
         // Parse it
-        parsefile(file, dest);
+        parsefile(file, dest, hdr);
     } while((proj = strtok(NULL, " ")) != NULL);
     return 0;
 }
 
 // Parses a configuration file
-void parsefile(FILE* src, FILE* dest)
+void parsefile(FILE* src, FILE* dest, FILE* hdr)
 {
     // Begin parsing the file,
     char* line = (char*)malloc(LINESZ);
@@ -97,6 +97,7 @@ void parsefile(FILE* src, FILE* dest)
         panic("out of memory");
         fclose(src);
         fclose(dest);
+        fclose(hdr);
         exit(1);
     }
     char* orgline = line;
@@ -125,13 +126,14 @@ void parsefile(FILE* src, FILE* dest)
             // If there was a previous title, run all of its sub-configuration files
             if(title)
             {
-                int res = runsubprojects(title, dest);
+                int res = runsubprojects(title, dest, hdr);
                 if(res == 1)
                 {
                     free(title);
                     free(line);
                     fclose(dest);
                     fclose(src);
+                    fclose(hdr);
                     exit(1);
                 }
                 else if(res == 2)
@@ -139,13 +141,23 @@ void parsefile(FILE* src, FILE* dest)
                     free(line);
                     fclose(dest);
                     fclose(src);
+                    fclose(hdr);
                     exit(1);
                 }
             }
             // Copy it over
             ++line;
             title = malloc(len - 1);
+            if(!title)
+            {
+                free(line);
+                fclose(dest);
+                fclose(src);
+                fclose(hdr);
+                exit(1);
+            }
             strcpy(title, line);
+            line = orgline;
             continue;
         }
         // This is a variable assignment. Get everything up until the first whitespace
@@ -186,6 +198,7 @@ void parsefile(FILE* src, FILE* dest)
             free(orgline);
             fclose(src);
             fclose(dest);
+            fclose(hdr);
             exit(1);
         }
         int elpos = 0;
@@ -269,6 +282,16 @@ void parsefile(FILE* src, FILE* dest)
         fwrite("=\\\"${", 5, 1, dest);
         fwrite(fullname, titlelen + namelen + 1, 1, dest);
         fwrite("}\\\"\" \n", 6, 1, dest);
+        // Write out the header #define line
+        fwrite("#define ", 8, 1, hdr);
+        fwrite(fullname, titlelen + namelen + 1, 1, hdr);
+        fwrite(" ", 1, 1, hdr);
+        if(foundquote)
+            fwrite("\"", 1, 1, hdr);
+        fwrite(evaledline, elpos, 1, hdr);
+        if(foundquote)
+            fwrite("\"", 1, 1, hdr);
+        fwrite("\n", 1, 1, hdr);
         free:
         free(evaledline);
         if(exiting)
@@ -277,15 +300,17 @@ void parsefile(FILE* src, FILE* dest)
             free(orgline);
             fclose(src);
             fclose(dest);
+            fclose(hdr);
             exit(1);
         }
         line = orgline;
     }
-    if(line != orgline)
-        line = orgline;
+    line = orgline;
     // Run all subprojects
-    runsubprojects(title, dest);
+    runsubprojects(title, dest, hdr);
     free(line);
+    if(title)
+        free(title);
 }
 
 // Program entry point
@@ -293,7 +318,7 @@ int main(int argc, char** argv)
 {
     progname = basename(argv[0]);
     // Grab the file we want to read and the output too
-    if(argc < 3)
+    if(argc < 4)
     {
         panic("configuration file and output file must be passed");
         exit(1);
@@ -312,9 +337,18 @@ int main(int argc, char** argv)
         panic("%s: %s\n", argv[2], strerror(errno));
         exit(1);
     }
+    // Open up header file
+    FILE* hdr = fopen(argv[3], "w");
+    if(!hdr)
+    {
+        panic("%s: %s\n", argv[3], strerror(errno));
+        exit(1);
+    }
     // Parse all the files
-    parsefile(conf, output);
+    parsefile(conf, output, hdr);
     // Cleanup files and memory
     fclose(conf);
+    fclose(output);
+    fclose(hdr);
     return 0;
 }

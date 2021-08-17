@@ -1,4 +1,4 @@
-# CMakeLists.txt - contains CMake build for confgen utility
+# CMakeLists.txt - contains CMake stuff for nexboot BIOS
 # Copyright 2021 Jedidiah Thompson
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,18 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
-project(confgen)
 
-set(CMAKE_C_STANDARD 11)
-enable_language(C)
+# Begin building the MBR
+project(nbmbr)
+enable_language(ASM_NASM)
 
-set(CMAKE_C_FLAGS "-O3 -DNDEBUG")
+# Setup the flags for NASM
+set(OLD_ASMFLAGS ${CMAKE_ASM_FLAGS})
+# CMake's NASM support is very broken. This kind of fixes it
+set(CMAKE_ASM_NASM_LINK_EXECUTABLE "${GLOBAL_CROSS}/bin/${GLOBAL_MACH}-elf-ld -Ttext=0x600 \
+${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/nbmbr.dir/start/mbr.asm.o -o ${CMAKE_CURRENT_BINARY_DIR}/nbmbr \
+--oformat=binary")
+set(CMAKE_ASM_FLAGS "-felf32")
 
-add_executable(confgen confgen.c)
-install(TARGETS confgen DESTINATION .)
-
-
+add_executable(nbmbr start/mbr.asm)
+install(TARGETS nbmbr DESTINATION ./biosboot)

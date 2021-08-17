@@ -42,4 +42,5 @@
 [Pcd]
 
 [BuildOptions]
-  *_GCC5_*_CC_FLAGS = -I$(PWD)/../../../../../../../../../../usr/include -DNEXBOOT_UEFI=1 -DNEXBOOT_PANICDELAY=$(NEXBOOT_PANICDELAY)
+  *_GCC5_*_CC_FLAGS = -I$(PWD)/../../../../../../../../../../usr/include -DNEXBOOT_UEFI=1
+  *_GCC5_*_CC_FLAGS = -DGLOBAL_ARCH=$(GLOBAL_ARCH) -DGLOBAL_MACH=$(GLOBAL_MACH) -DGLOBAL_BOARD=$(GLOBAL_BOARD)

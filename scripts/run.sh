@@ -29,22 +29,25 @@ fi
 
 # Check if we need to use KVM
 QEMUFLAGS=
-if [ "$GLOBAL_USEKVM" = "1" ]
+if [ "$USEKVM" = "1" ]
 then
-    QEMUFLAGS+=-enable-kvm
+    QEMUFLAGS="${QEMUFLAGS} -enable-kvm"
+fi
+
+if [ "$USEBIOS" != "1" ]
+then
+    QEMUFLAGS="${QEMUFLAGS} -drive if=pflash,format=raw,unit=0,file=fw/EFI_$arch.fd \
+                        -drive if=pflash,format=raw,unit=1,file=fw/EFI_${arch}_VARS.fd"
 fi
 
 if [ "$board" = "pc" ]
 then
-    qemu-system-$mach -M q35 -m 512M -drive if=pflash,format=raw,unit=0,file=fw/EFI_$arch.fd \
-                        -drive if=pflash,format=raw,unit=1,file=fw/EFI_${arch}_VARS.fd \
-                        -device qemu-xhci -device usb-kbd -smp 8 -drive file=images-$arch/nndisk.img,format=raw \
+    qemu-system-$mach -M q35 -m 512M -device qemu-xhci \
+                        -device usb-kbd -smp 8 -drive file=images-$arch/nndisk.img,format=raw \
                         $QEMUFLAGS
 elif [ "$arch" = "aarch64-sr" ]
 then
-    qemu-system-$mach -M virt -cpu max -drive if=pflash,format=raw,unit=0,file=fw/EFI_$arch.fd \
-                        -drive if=pflash,format=raw,unit=1,file=fw/EFI_${arch}_VARS.fd -device qemu-xhci \
-                        -device usb-kbd -device virtio-blk,drive=hd0 \
+    qemu-system-$mach -M virt -cpu max -device qemu-xhci -device usb-kbd -device virtio-blk,drive=hd0 \
                         -drive if=none,format=raw,file=images-$arch/nndisk.img,id=hd0 \
                         -device virtio-gpu -m 512M -smp 8 $QEMUFLAGS
 fi

@@ -300,6 +300,8 @@ main()
     then
         . $PWD/config/config-$GLOBAL_ARCH.sh
     fi
+    # Parse args to override configuration file
+    argparse
     # Split up the architecture into machine and board
     export GLOBAL_MACH=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $1 }')
     export GLOBAL_BOARD=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $2 }')
@@ -325,7 +327,8 @@ main()
             mkdir $PWD/config
         fi
         # Generate the configuration script
-        ./utilsbin/confgen scripts/nexnix.cfg config/config-$GLOBAL_ARCH.sh
+        ./utilsbin/confgen scripts/nexnix.cfg config/config-$GLOBAL_ARCH.sh \
+                            $PWD/usr/include/config-${GLOBAL_ARCH}.h
         . $PWD/config/config-$GLOBAL_ARCH.sh
         # Set the debug variable
         if [ "$GLOBAL_DEBUG" = "1" ]
@@ -344,7 +347,8 @@ main()
         fi
         # Create the disk image
         ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -d $GLOBAL_PREFIX \
-                           -p1,300,esp,/boot -p301,2047,ext2,/fsroot -u $GLOBAL_USER
+                           -p1,300,esp,/boot -p601,2047,ext2,/fsroot \
+                           -p301,600,fat32,/biosboot -u $GLOBAL_USER
         if [ "$GLOBAL_BOARD" = "sr" ]
         then
             # Make ESP usable by ARM firmware that isn't aware of GPT

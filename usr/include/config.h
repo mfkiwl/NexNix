@@ -1,5 +1,5 @@
 /*
-    nexboot.h - contains bootloader definitions
+    config.h - select the right configuration header based off of target arch
     Copyright 2021 Jedidiah Thompson
 
     Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,11 +15,15 @@
     limitations under the License.
 */
 
-#ifndef _NEXBOOT_H
-#define _NEXBOOT_H
+#ifndef _CONFIG_H
+#define _CONFIG_H
 
-#include <version.h>
-#include <boot/nbefi.h>
-#include <config.h>
+#if GLOBAL_ARCH == i686-pc
+#include <config-i686-pc.h>
+#elif GLOBAL_ARCH == x86_64-pc
+#include <config-x86_64-pc.h>
+#elif GLOBAL_ARCH == aarch64-sr
+#include <config-aarch64-sr.h>
+#endif
 
 #endif
