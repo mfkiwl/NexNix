@@ -1,5 +1,5 @@
 /*
-    mbrwrap.c - generates a configuration script from configuration file
+    confgen.c - generates a configuration script from configuration file
     Copyright 2021 Jedidiah Thompson
 
     Licensed under the Apache License, Version 2.0 (the "License");
