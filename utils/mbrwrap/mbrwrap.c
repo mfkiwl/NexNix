@@ -22,7 +22,7 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <assert.h>
+#include <errno.h>
 
 char* progname = NULL;
 
@@ -79,7 +79,7 @@ int main(int argc, char** argv)
     int imgfd = open(img, O_RDWR);
     if(!imgfd)
     {
-        printf("%s: unable to open image\n", progname);
+        printf("%s: %s: %s\n", progname, img, strerror(errno));
         return 1;
     }
     // Read in the MBR
@@ -88,7 +88,7 @@ int main(int argc, char** argv)
     memcpy(&mbr.parts[1], &mbr.parts[0], sizeof(mbrpart_t));
     memset(&mbr.parts[0].chsstart, 0xFF, 3);            // Set default CHS values
     memset(&mbr.parts[0].chsend, 0xFF, 3);
-    mbr.parts[0].flags = 0x0;
+    mbr.parts[0].flags = 0x80;
     mbr.parts[0].type = 0x0C;                           // Win95 LBA type
     mbr.parts[0].lbastart = ((base * 1048576) / 512);   // Set base (in sectors)
     mbr.parts[0].lbasize = ((size * 1048576) / 512);    // Set LBA end

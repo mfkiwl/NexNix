@@ -130,7 +130,7 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
                 if(res == 1)
                 {
                     free(title);
-                    free(line);
+                    free(orgline);
                     fclose(dest);
                     fclose(src);
                     fclose(hdr);
@@ -138,19 +138,21 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
                 }
                 else if(res == 2)
                 {
-                    free(line);
+                    free(orgline);
                     fclose(dest);
                     fclose(src);
                     fclose(hdr);
                     exit(1);
                 }
+                free(title);
             }
             // Copy it over
             ++line;
             title = malloc(len - 1);
             if(!title)
             {
-                free(line);
+                panic("out of memory");
+                free(orgline);
                 fclose(dest);
                 fclose(src);
                 fclose(hdr);
@@ -165,10 +167,22 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
         char* name = line;
         // Terminate it
         int i = 0;
+        len = strlen(line);
         while(!isspace(name[i]) && name[i] != '=')
+        {
             ++i;
+            if(i == len)
+            {
+                panic("unterminated variable");
+                free(orgline);
+                fclose(dest);
+                fclose(src);
+                fclose(hdr);
+                exit(1);
+            }
+        }
         name[i] = '\0';
-        // Move to after variable value
+        // Move to after variable name
         line += (i + 1);
         // Go to the value now
         while(isspace(*line) || *line == '=')
@@ -246,7 +260,7 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
         // Check for an unterminated variable
         if(foundvar)
         {
-            panic("unterminated variable");
+            panic("unterminated variable reference");
             exiting = 1;
             goto free;
         }

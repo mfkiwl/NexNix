@@ -14,17 +14,17 @@
 
 cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
 
+# Setup the flags for NASM
+set(OLD_OBJFMT ${CMAKE_ASM_NASM_OBJECT_FORMAT})
+# CMake's NASM support is very broken. This kind of fixes it
+set(CMAKE_ASM_NASM_LINK_EXECUTABLE "${GLOBAL_CROSS}/bin/${GLOBAL_MACH}-elf-ld -Ttext=0x600 \
+${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/nbmbr.dir/start/mbr.asm.o -o ${CMAKE_CURRENT_BINARY_DIR}/nbmbr \
+--oformat=binary -e start")
+set(CMAKE_ASM_NASM_OBJECT_FORMAT elf32)
+
 # Begin building the MBR
 project(nbmbr)
 enable_language(ASM_NASM)
 
-# Setup the flags for NASM
-set(OLD_ASMFLAGS ${CMAKE_ASM_FLAGS})
-# CMake's NASM support is very broken. This kind of fixes it
-set(CMAKE_ASM_NASM_LINK_EXECUTABLE "${GLOBAL_CROSS}/bin/${GLOBAL_MACH}-elf-ld -Ttext=0x600 \
-${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/nbmbr.dir/start/mbr.asm.o -o ${CMAKE_CURRENT_BINARY_DIR}/nbmbr \
---oformat=binary")
-set(CMAKE_ASM_FLAGS "-felf32")
-
 add_executable(nbmbr start/mbr.asm)
-install(TARGETS nbmbr DESTINATION ./biosboot)
+install(TARGETS nbmbr DESTINATION ./boot)

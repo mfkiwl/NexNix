@@ -18,3 +18,4 @@ enable_language(C)
 
 add_subdirectory(mbrwrap)
 add_subdirectory(confgen)
+add_subdirectory(mbrwrite)

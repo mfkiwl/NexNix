@@ -10,4 +10,5 @@ config-*.h
 cross
 images-*
 build-*
+bochs.txt
 .VSCodeCounter

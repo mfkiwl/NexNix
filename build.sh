@@ -329,6 +329,7 @@ main()
         # Generate the configuration script
         ./utilsbin/confgen scripts/nexnix.cfg config/config-$GLOBAL_ARCH.sh \
                             $PWD/usr/include/config-${GLOBAL_ARCH}.h
+        checkerror $? "unable to generate configuration"
         . $PWD/config/config-$GLOBAL_ARCH.sh
         # Set the debug variable
         if [ "$GLOBAL_DEBUG" = "1" ]
@@ -347,11 +348,16 @@ main()
         fi
         # Create the disk image
         ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -d $GLOBAL_PREFIX \
-                           -p1,300,esp,/boot -p601,2047,ext2,/fsroot \
-                           -p301,600,fat32,/biosboot -u $GLOBAL_USER
+                           -p1,300,esp,/boot -p301,2047,ext2,/fsroot -u $GLOBAL_USER
         if [ "$GLOBAL_BOARD" = "sr" ]
         then
             # Make ESP usable by ARM firmware that isn't aware of GPT
+            ./utilsbin/mbrwrap $GLOBAL_IMAGE/nndisk.img 1 300
+        elif [ "$GLOBAL_BOARD" = "pc" ]
+        then
+            # Write out MBR and VBR to disk
+            ./utilsbin/mbrwrite $GLOBAL_PREFIX/boot/nbmbr $GLOBAL_IMAGE/nndisk.img
+            # Wrap up ESP so MBR can load it
             ./utilsbin/mbrwrap $GLOBAL_IMAGE/nndisk.img 1 300
         fi
     elif [ "$GLOBAL_ACTION" = "build" ]

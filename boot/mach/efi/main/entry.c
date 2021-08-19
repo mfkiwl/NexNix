@@ -22,7 +22,7 @@ EFI_STATUS EFIAPI nb_main(EFI_HANDLE img, EFI_SYSTEM_TABLE* systab)
 {
     // Set up UEFI wrapper and EDK2
     efi_init(img, systab);
-
+    efi_printearly(L"nexboot: starting up\r\n");
     for(;;);
     return EFI_NOT_READY;
 }

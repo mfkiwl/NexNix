@@ -1,4 +1,4 @@
-# CMakeLists.txt - contains CMake stuff for nexboot
+# CMakeLists.txt - contains mbrwrite build system
 # Copyright 2021 Jedidiah Thompson
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.00)
+project(mbrwrite)
 
-# Build the BIOS bootloader on PC
-if(${GLOBAL_BOARD} STREQUAL "pc")
-    add_subdirectory(mach/bios)
-endif()
+set(CMAKE_C_STANDARD 11)
+enable_language(C)
+set(CMAKE_C_FLAGS "-O3 -DNDEBUG")
+
+add_executable(mbrwrite mbrwrite.c)
+install(TARGETS mbrwrite DESTINATION .)
