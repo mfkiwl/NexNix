@@ -1,0 +1,11 @@
+romimage: file=$BXSHARE/BIOS-bochs-latest
+vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest
+ata0-master: type=disk, path=images-x86_64-pc/nndisk.img
+cpu: count=2, ips=10000000
+boot: disk
+magic_break: enabled=1
+megs: 512
+com1: enabled=1, mode=file, dev=serial.txt
+clock: sync=slowdown, rtc_sync=0
+log: bochs.log
+display_library: x, options="gui_debug"

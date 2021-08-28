@@ -5,10 +5,13 @@ rootdir-*
 utilsbin
 fs
 config
+output-*
 config-*.h
 .vscode
 cross
 images-*
 build-*
-bochs.txt
+serial.txt
+bochs.log
+*.ini
 .VSCodeCounter

@@ -1,0 +1,8 @@
+# conf-i386pc.txt - contains file listings for i386pc configuration
+# SPDX-License-Identifier: ISC
+
+file output/nexboot boot/nexboot
+file output/BOOTIA32.EFI boot/EFI/BOOT/BOOTIA32.EFI
+image 2048 nndisk.img gpt 1,300,esp,/boot
+mbrwrite output/nbmbr nndisk.img output/nbvbr 2048
+mbrwrap nndisk.img 1 300

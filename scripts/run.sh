@@ -1,17 +1,7 @@
 #! /usr/bin/env sh
 # run.sh - launches QEMU
-# Copyright 2021 Jedidiah Thompson
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: ISC
+
 arch=$1
 if [ -z "$arch" ]
 then
@@ -22,9 +12,57 @@ fi
 mach=$(echo "$arch" | awk -F'-' '{ print $1 }')
 board=$(echo "$arch" | awk -F'-' '{ print $2 }')
 
-if [ "$mach" = "i686" ]
+if [ "$USEBOCHS" = "1" ]
 then
-    mach=i386
+    # Check that the architecture can run Bochs
+    if [ "$board" != "pc" ]
+    then
+        echo "$(basename $0): error: $arch incompatible with Bochs"
+        exit 1
+    fi
+    if [ "$mach" = "i386" ] && [ "$USELEGACY" = "1" ]
+    then
+        bochs -q -f scripts/bochs-i386legacy.txt
+    else
+        bochs -q -f  scripts/bochs-${arch}.txt
+    fi
+    return
+elif [ "$USEVBOX" = "1" ]
+then
+    # Check that the architecture can run VBox
+    if [ "$board" != "pc" ]
+    then
+        echo "$(basename $0): error: $arch incompatible with VirtualBox"
+        exit 1
+    fi
+    # Check if a NexNix machine has been added yet
+    isnexnix=$(VBoxManage list vms | awk '/NexNix/ { print $0 }')
+    rm -f images-${arch}/nndisk.vdi
+    if [ ! -z "$isnexnix" ]
+    then
+        VBoxManage storagectl "NexNix" --name "NexNix-storage" --remove
+        VBoxManage closemedium disk images-${arch}/nndisk.vdi
+    fi
+    VBoxManage convertfromraw images-${arch}/nndisk.img images-${arch}/nndisk.vdi --format VDI
+    if [ -z "$isnexnix" ]
+    then
+        VBoxManage createvm --name "NexNix" --register
+        VBoxManage modifyvm "NexNix" --memory 1024 --acpi on --hpet on --pae on \
+                    --graphicscontroller vmsvga --usbehci on --ostype "Other_64"
+    fi
+    if [ "$USEBIOS" = "1" ]
+    then
+        VBoxManage modifyvm "NexNix" --firmware bios
+    else
+        VBoxManage modifyvm "NexNix" --firmware efi
+    fi
+    VBoxManage storagectl "NexNix" --name "NexNix-storage" --add sata --controller IntelAhci \
+                    --bootable on --portcount 1
+    VBoxManage storageattach "NexNix" --storagectl "NexNix-storage" --port 1 --medium \
+                    "images-${arch}/nndisk.vdi" --type hdd
+    # Start it
+    VBoxManage startvm --putenv VBOX_GUI_DBG_ENABLED=true "NexNix"
+    return
 fi
 
 # Check if we need to use KVM
@@ -42,12 +80,18 @@ fi
 
 if [ "$board" = "pc" ]
 then
-    qemu-system-$mach -M q35 -m 512M -device qemu-xhci \
+    if [ "$USELEGACY" = "1" ]
+    then
+        qemu-system-$mach -M isapc -cpu 486 -m 16M -drive file=images-$arch/nnlegacy.img,format=raw
+    else
+        qemu-system-$mach -M q35 -m 512M -device qemu-xhci \
                         -device usb-kbd -smp 8 -drive file=images-$arch/nndisk.img,format=raw \
                         $QEMUFLAGS
-elif [ "$arch" = "aarch64-sr" ]
+    fi
+elif [ "$board" = "sr" ]
 then
-    qemu-system-$mach -M virt -cpu max -device qemu-xhci -device usb-kbd -device virtio-blk,drive=hd0 \
-                        -drive if=none,format=raw,file=images-$arch/nndisk.img,id=hd0 \
-                        -device virtio-gpu -m 512M -smp 8 $QEMUFLAGS
+    qemu-system-$mach -M virt -cpu max -device qemu-xhci \
+                        -device usb-kbd -device virtio-gpu -m 512M -smp 8 $QEMUFLAGS \
+                        -device virtio-blk,drive=hd0 -drive \
+                        if=none,format=raw,file=images-$arch/nndisk.img,id=hd0
 fi

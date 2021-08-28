@@ -1,16 +1,5 @@
 ; mbr.asm - contains master boot record startup code
-; Copyright 2021 Jedidiah Thompson
-; Licensed under the Apache License, Version 2.0 (the "License");
-; you may not use this file except in compliance with the License.
-; You may obtain a copy of the License at
-;
-;    http://www.apache.org/licenses/LICENSE-2.0
-;
-; Unless required by applicable law or agreed to in writing, software
-; distributed under the License is distributed on an "AS IS" BASIS,
-; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-; See the License for the specific language governing permissions and
-; limitations under the License.
+; SPDX-License-Identifier: ISC
 
 bits 16
 cpu 386
@@ -119,7 +108,7 @@ mbrstart:
 
     ; Make sure BIOS LBA extentions are available
     mov ah, 41h
-    mov bx, 55AAh
+    mov bx, 0x55AA
     int 13h
     ; Load error message
     mov si, exterrmsg
@@ -141,6 +130,8 @@ mbrstart:
     mov eax, dword [si+8]               ; Load up the LBA start of this volume
     mov di, MBR_BIOSBASE
     call mbrreadsector                  ; Read it in
+    cmp word [0x7DFE], MBR_BIOSSIG      ; Check signature
+    jne .notfound                       ; If not found, we have an error
     ; Print out leading message
     mov si, loadmsg
     call mbrprint

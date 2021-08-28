@@ -1,18 +1,6 @@
 /*
     mbrwrap.c - wraps ESP in MBR partition
-    Copyright 2021 Jedidiah Thompson
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
+    SPDX-License-Identifier: ISC
 */
 
 #include <stdio.h>
@@ -85,13 +73,12 @@ int main(int argc, char** argv)
     // Read in the MBR
     mbr_t mbr;
     read(imgfd, &mbr, sizeof(mbr_t));
-    memcpy(&mbr.parts[1], &mbr.parts[0], sizeof(mbrpart_t));
-    memset(&mbr.parts[0].chsstart, 0xFF, 3);            // Set default CHS values
-    memset(&mbr.parts[0].chsend, 0xFF, 3);
-    mbr.parts[0].flags = 0x80;
-    mbr.parts[0].type = 0x0C;                           // Win95 LBA type
-    mbr.parts[0].lbastart = ((base * 1048576) / 512);   // Set base (in sectors)
-    mbr.parts[0].lbasize = ((size * 1048576) / 512);    // Set LBA end
+    memset(&mbr.parts[1].chsstart, 0xFF, 3);            // Set default CHS values
+    memset(&mbr.parts[1].chsend, 0xFF, 3);
+    mbr.parts[1].flags = 0x80;
+    mbr.parts[1].type = 0x0C;                           // Win95 LBA type
+    mbr.parts[1].lbastart = ((base * 1048576) / 512);   // Set base (in sectors)
+    mbr.parts[1].lbasize = ((size * 1048576) / 512);    // Set LBA end
     // Write it out
     lseek(imgfd, 0, SEEK_SET);
     write(imgfd, &mbr, sizeof(mbr_t));

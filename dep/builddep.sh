@@ -1,17 +1,6 @@
 #! /usr/bin/env sh
 # builddep.sh - builds dependencies of build process
-# Copyright 2021 Jedidiah Thompson
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: ISC
 
 # Versions
 gmpver=6.2.1
@@ -56,8 +45,7 @@ printdep()
     echo "In order to build NexNix, the following is required:"
     echo "A nearly POSIX compliant shell, bash (for building the toolchain), \
 GNU make (for building the toolchain), perl, texinfo, system build utilites (gcc, make, etc) \
-cmake, tar, flex, bison, gettext, wget, kpartx, mkfs.ext2, git, \
-aarch64 GCC, GNU parted, acpica-tools, nasm, DD, python3, and the ninja build system"
+cmake, aarch64 GCC, tar, flex, bison, gettext, wget, kpartx, mkfs.ext2, git, GNU parted, acpica-tools, nasm, and python"
 }
 
 # Checks one individual dependency
@@ -90,16 +78,14 @@ builddep()
     checkdep flex
     checkdep cmake
     checkdep wget
-    checkdep ninja
+    checkdep aarch64-linux-gnu-gcc
     checkdep kpartx
     checkdep mkfs.ext2
     checkdep parted
     checkdep git
-    checkdep aarch64-linux-gnu-gcc
     checkdep iasl
     checkdep python
     checkdep nasm
-    checkdep dd
 
     if [ $testpassed -eq 0 ]
     then
@@ -298,13 +284,11 @@ buildedk2()
     cd edk2 && git submodule update --init > build.log 2> builderr.log
     checkerr $? "EDK2 download failed"
     # Patch EDK2
+    cd ..
     patch -p0 -f < ../dep/edk2.patch > /dev/null 2>/dev/null
+    cd edk2
     echo "ok"
-    if [ "$GLOBAL_ARCH" != "aarch64-raspi3" ] 
-    then
-        echo -n "Building EDK2..."
-        export EDK_TOOLS_PATH=$PWD/BaseTools
-    fi
+    echo -n "Building EDK2..."
     # Build it now
     if [ "$GLOBAL_MACH" = "x86_64" ]
     then
@@ -319,7 +303,7 @@ buildedk2()
         cp Build/OvmfX64/DEBUG_GCC5/FV/OVMF_CODE.fd ../EFI_${GLOBAL_ARCH}.fd
         cp Build/OvmfX64/DEBUG_GCC5/FV/OVMF_VARS.fd ../EFI_${GLOBAL_ARCH}_VARS.fd
         echo "ok"
-    elif [ "$GLOBAL_MACH" = "i686" ]
+    elif [ "$GLOBAL_MACH" = "i386" ]
     then
         . $PWD/edksetup.sh > build.log 2> builderr.log
         checkerr $? "EDK2 build failed"
@@ -330,7 +314,9 @@ buildedk2()
         echo "ok"
         echo -n "Installing EDK2..."
         cp Build/OvmfIa32/DEBUG_GCC5/FV/OVMF_CODE.fd ../EFI_${GLOBAL_ARCH}.fd
+        truncate -s 64M ../EFI_${GLOBAL_ARCH}.fd
         cp Build/OvmfIa32/DEBUG_GCC5/FV/OVMF_VARS.fd ../EFI_${GLOBAL_ARCH}_VARS.fd
+        truncate -s 64M ../EFI_${GLOBAL_ARCH}_VARS.fd
         echo "ok"
     elif [ "$GLOBAL_ARCH" = "aarch64-sr" ]
     then
@@ -362,15 +348,15 @@ builddep
 if [ ! -d $GLOBAL_CROSS/src ]
 then
     mkdir -p $GLOBAL_CROSS/src
+fi
+
+cd $GLOBAL_CROSS/src
 
 # Check if libgmp, mpc, and mpfr have been built
 if [ ! -f "$GLOBAL_CROSS/deplib/lib/libgmp.a" ]
 then
     builddeplib
 fi
-
-fi
-cd $GLOBAL_CROSS/src
 
 # Build binutils now
 buildbinutils

@@ -1,17 +1,6 @@
 #! /bin/bash
 # image.sh - contains disk image management
-# Copyright 2021 Jedidiah Thompson
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: ISC
 
 # Data for use by this script
 args=$@
@@ -20,23 +9,30 @@ size=
 type=
 dir=
 parts=()
-fstypes="ext2 fat32 esp"
+fstypes="ext2 fat32 fat12 active esp"
+parttypes="mbr gpt floppy"
+parttype=
 user=
-hashybrid=0
+
+# Panics
+panic()
+{
+    echo "$(basename $0): $1"
+    exit 1
+}
 
 # Checks if an error occured, and panics if one did
 checkerr()
 {
     if [ "$1" != "0" ]
     then
-        echo "$0: $2"
-        exit 1
+        panic "$2"
     fi
 }
 
 argparse()
 {
-    arglist="p:s:i:d:u:"
+    arglist="p:s:i:d:u:t:"
     # Read them in
     while getopts $arglist arg $args > /dev/null 2> /dev/null; do
         case ${arg} in
@@ -53,17 +49,30 @@ argparse()
                 # Check that is exists
                 if [ ! -d $OPTARG ]
                 then
-                    echo "$0: directory does not exist"
-                    exit 1
+                    panic "directory does not exist"
                 fi
                 dir=$OPTARG
                 ;;
             "u")
                 user=$OPTARG
                 ;;
+            "t")
+                # Check that is is valid
+                for type in $parttypes
+                do
+                    if [ "$OPTARG" = "$type" ]
+                    then
+                        parttype=$OPTARG
+                        break
+                    fi
+                done
+                if [ -z "$parttype" ]
+                then
+                    panic "partition type invalid"
+                fi
+                ;;
             "?")
-                echo "$0: unrecognized argument"
-                exit 1
+                panic "unrecognized argument specified"
                 ;;
         esac
     done
@@ -74,40 +83,47 @@ checkarg()
     # Check for required arguments
     if [ -z "$size" ]
     then
-        echo "$0: size not specified"
-        exit 1
+        panic "size not specified"
     fi
 
     if [ -z "${parts[0]}" ]
     then
-        echo "$0: partition not specified"
-        exit 1
+        panic "partition not specified"
     fi
 
     if [ -z "$image" ]
     then
-        echo "$0: image file not specified"
-        exit 1
+        panic "image file not specified"
     fi
 
     if [ -z "$dir" ]
     then
-        echo "$0: input directory not specified"
-        exit 1
+        panic "input directory not specified"
     fi
 
     if [ -z "$user" ]
     then
-        echo "$0: user not specified"
-        exit 1
+        panic "user not specified"
+    fi
+
+    if [ -z "$parttype" ]
+    then
+        panic "partition type not specified"
     fi
 }
 
 partimg()
 {
-    # First create a partition table 
-    parted -s $image "mklabel gpt"
-    checkerr $? "unable to create partition table"
+    # First create a partition table, except on floppies
+    if [ "$parttype" = "gpt" ]
+    then
+        parted -s $image "mklabel gpt"
+        checkerr $? "unable to create partition table"
+    elif [ "$parttype" = "mbr" ]
+    then
+        parted -s $image "mklabel msdos"
+        checkerr $? "unable to create partition table"
+    fi
     # Loop through every partition
     index=0
     while [ ! -z "${parts[$index]}" ]
@@ -118,9 +134,7 @@ partimg()
         base=$(echo "$base" | awk '/[0-9]/')
         if [ -z "$base" ]
         then
-            echo "$0: invalid partition entry"
-            rm -f tmp.img
-            exit 1
+            panic "base sector not specified in partition entry"
         fi
         # Grab the size
         psize=$(echo "${parts[$index]}" | awk -F',' '{ print $2 }')
@@ -128,17 +142,13 @@ partimg()
         psize=$(echo "$psize" | awk '/[0-9]/')
         if [ -z "$psize" ]
         then
-            echo "$0: invalid partition entry"
-            rm -f tmp.img
-            exit 1
+            panic "size not specified in partition entry"
         fi
         # Grab the filesystem type
         fstype=$(echo "${parts[$index]}" | awk -F',' ' { print $3 }')
         if [ -z "$fstype" ]
         then
-            echo "$0: invalid partition entry"
-            rm -f tmp.img
-            exit 1
+            panic "filesystem not specified on partition entry"
         fi
         typefound=0
         # Verify it
@@ -152,37 +162,64 @@ partimg()
         done
         if [ $typefound -ne 1 ]
         then
-            echo "$0: invalid partition entry"
-            rm -f tmp.img
-            exit 1
+            panic "invalid filesystem specified in partition entry"
         fi
         # Grab the directory prefix
         dirprefix=$(echo "${parts[$index]}" | awk -F',' ' { print $4 }')
         if [ -z "$dirprefix" ]
         then
-            echo "$0: invalid partition entry"
-            rm -f tmp.img
-            exit 1
+            panic "prefix not specified in partition entry"
         fi
         # Verify that is starts with a /
         slash=$(echo "$dirprefix" | awk '/^\//')
         if [ -z "$slash" ]
         then
-            echo "$0: partition prefix must be absolute"
-            rm -f tmp.img
-            exit 1
+            panic "partition prefix must be absolute"
         fi
         if [ "$base" = "0" ]
         then
             base=1
         fi
+        # Handle floppy disks
+        if [ "$parttype" = "floppy" ]
+        then
+            loopdev=$(losetup -f)
+            losetup $loopdev $image
+            mkfs.vfat -F12 $loopdev
+            mkdir fs
+            mount $loopdev fs
+            cp ${dir}${dirprefix}/* fs/
+            sleep 1
+            umount fs
+            losetup -d $loopdev
+            rm -rf fs
+            return
+        fi
         # Create the partition
         if [ "$fstype" = "esp" ]
         then
+            if [ "$parttype" = "mbr" ]
+            then
+                panic "ESP cannot be created on MBR volume"
+            fi
             parted -s $image "unit MiB mkpart empty fat32 $base $psize set $((index+1)) esp on"
             checkerr $? "unable to create partition"
+        elif [ "$fstype" = "active" ]
+        then
+            if [ "$parttype" = "gpt" ]
+            then
+                panic "active partition cannot be created on GPT volume"
+            fi
+            parted -s $image "unit MiB mkpart primary fat32 $base $psize set $((index+1)) boot on"
+            checkerr $? "unable to create partition"
         else
-            parted -s $image "unit MiB mkpart empty $fstype $base $psize"
+            if [ "$parttype" = "mbr" ]
+            then
+                parted -s $image "unit MiB mkpart primary $base $psize"
+            elif [ "$parttype" = "gpt" ]
+            then
+                parted -s $image "unit MiB mkpart empty $base $psize"
+            fi
             checkerr $? "unable to create partition"
         fi
         # Create the loopback device
@@ -191,14 +228,14 @@ partimg()
         checkerr $? "adding partition failed"
         dev=$(echo "$dev" | awk -vline=$((index+1)) '$FNR == $line { print $3 }')
         # Format it
-        if [ "$fstype" = "fat32" ] || [ "$fstype" = "esp" ] || [ "$fstype" = "hybrid" ]
+        if [ "$fstype" = "fat32" ] || [ "$fstype" = "esp" ] || [ "$fstype" = "active" ]
         then
-            mkfs.vfat /dev/mapper/$dev > /dev/null 2>&1
+            mkfs.fat -F32 /dev/mapper/$dev > /dev/null 2>&1
         elif [ "$fstype" = "ext2" ]
         then
             mke2fs /dev/mapper/$dev > /dev/null 2>&1
         fi
-        # Copy over the needed data to this partitionS
+        # Copy over the needed data to this partition
         mkdir fs
         mount /dev/mapper/$dev fs
         sleep 1
@@ -220,12 +257,11 @@ main()
     # Verfiy the arguments
     checkarg
     # Create the disk image
-    if [ ! -f $image ]
+    if [ ! -f $image ] && [ ! -b $image ]
     then
         dd if=/dev/zero of=$image bs=1M count=$size > /dev/null 2>&1
         checkerr $? "disk image creation failed"
     fi
-
     # Partition the disk image
     partimg $image
     # Change ownership to caller

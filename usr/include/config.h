@@ -1,25 +1,13 @@
 /*
     config.h - select the right configuration header based off of target arch
-    Copyright 2021 Jedidiah Thompson
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
+    SPDX-License-Identifier: ISC
 */
 
 #ifndef _CONFIG_H
 #define _CONFIG_H
 
-#if GLOBAL_ARCH == i686-pc
-#include <config-i686-pc.h>
+#if GLOBAL_ARCH == i386-pc
+#include <config-i386-pc.h>
 #elif GLOBAL_ARCH == x86_64-pc
 #include <config-x86_64-pc.h>
 #elif GLOBAL_ARCH == aarch64-sr

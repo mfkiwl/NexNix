@@ -1,17 +1,6 @@
 #! /usr/bin/env sh
 # buildrun.sh - build and run shortcut for Linux
-# Copyright 2021 Jedidiah Thompson
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: ISC
 
 checkerr()
 {
@@ -26,23 +15,36 @@ checkerr()
 arch=$1
 if [ -z "$arch" ]
 then
-    echo "$(basename $0): error: architecture must be set"
+    echo "$(basename $0): error: architecture not specified"
 fi
 
-# Check if we need to configure it
-if [ ! -d $PWD/build-$arch ] && [ "$RECONFIGURE" != "1" ]
-then
-    ./build.sh -a$arch -Aconfigure -p$PWD/rootdir-$arch -d -j$(nproc)
-    checkerr $? "unable to configure NexNix"
-fi
+# Configure it
+./build.sh -a$arch -Aconfigure -p$PWD/rootdir-$arch -d -j$(nproc)
+checkerr $? "unable to configure NexNix"
 
 # Build it
 ./build.sh -a$arch -Abuild -p$PWD/rootdir-$arch -j$(nproc)
-checkerr $? "unable to build NexNix"
+#checkerr $? "unable to build NexNix"
 
-# Create the images(s)
-sudo ./build.sh -a$arch -Aimage -i$PWD/images-$arch -p$PWD/rootdir-$arch -u$(whoami)
+# Figure out what configuration to use
+if [ "$arch" = "i386-pc" ]
+then
+    if [ "$USELEGACY" = "1" ]
+    then
+        conf=i386pc-legacy
+    else
+        conf=i386pc
+    fi
+elif [ "$arch" = "x86_64-pc" ]
+then
+    conf=x86_64pc
+elif [ "$arch" = "aarch64-sr" ]
+then
+    conf=aarch64sr
+fi
+sudo ./build.sh -a$arch -Aimage -iimages-$arch -p$PWD/rootdir-$arch -u$(whoami) -c$conf
 checkerr $? "unable to generate disk image(s) for NexNix"
 
 # Run it in QEMU
 ./scripts/run.sh $arch
+ 

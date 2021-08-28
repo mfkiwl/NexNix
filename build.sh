@@ -1,22 +1,14 @@
 #! /usr/bin/env sh
 # build.sh - the top level build system for NexNix
-# Copyright 2021 Jedidiah Thompson
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: ISC
 
 # Base variables
 export GLOBAL_ACTIONS="clean dep image configure build"
 export GLOBAL_JOBCOUNT=1
-export GLOBAL_ARCHS="x86_64-pc i686-pc aarch64-sr"
+export GLOBAL_ARCHS="x86_64-pc i386-pc aarch64-sr"
+export i386pc_configs="i386pc-legacy i386pc"
+export x86_64pc_configs="x86_64pc"
+export aarch64sr_configs="aarch64sr"
 export GLOBAL_CROSS="$PWD/cross"
 
 # Helper functions
@@ -68,6 +60,7 @@ Below are valid options which can be passed to $(basename $0)
     -d - specifies that we are in debug mode
     -P - specifies that profiling is to be enabled. This should be used with -d for optimal resuslts
     -u - specifies users to chown disk images to
+    -c - specifies the configuration to build
 end
     exit 0
 }
@@ -75,9 +68,9 @@ end
 # Parses data in the GLOBAL_ARGS variable
 argparse()
 {
-    arglist="A:hj:i:p:a:dD:Pu:"
+    arglist="A:hj:i:p:a:dD:Pu:c:"
     # Start the loop
-    while getopts $arglist arg $GLOBAL_ARGS > /dev/null 2> /dev/null; do
+    while getopts $arglist arg $GLOBAL_ARGS > /dev/null 2>&1; do
         case ${arg} in
             "h")
                 # If -h was passed, print out the help screen
@@ -115,8 +108,11 @@ argparse()
             "u")
                 export GLOBAL_USER="$OPTARG"
                 ;;
+            "c")
+                export GLOBAL_CONFIG="$OPTARG"
+                ;;
             "?")
-                panic "invalid argument sent"
+                panic "invalid argument specified"
         esac
     done
 
@@ -167,7 +163,7 @@ sanitycheck()
     # Check for a valid action
     if [ -z "$GLOBAL_ACTION" ]
     then
-        panic "action must be set"
+        panic "action not specifed"
     fi
     foundaction=0
     for action in $GLOBAL_ACTIONS
@@ -189,11 +185,18 @@ sanitycheck()
         # Check everything image specific
         if [ -z "$GLOBAL_IMAGE" ]
         then
-            panic "image must be sent"
+            panic "image not specified"
         fi
-        if [ -z "$GLOBAL_USER" ] && [ "$GLOBAL_ACTION" = "image" ]
+        if [ "$GLOBAL_ACTION" = "image" ]
         then
-            panic "user must be sent"
+            if [ -z "$GLOBAL_USER" ]
+            then
+                panic "user not specified"
+            fi
+            if [ -z "$GLOBAL_CONFIG" ]
+            then
+                panic "configuration not specified"
+            fi
         fi
     fi
     # Now check common stuff
@@ -209,7 +212,7 @@ sanitycheck()
     # Check the prefix
     if [ -z "$GLOBAL_PREFIX" ] && [ "$GLOBAL_ACTION" != "dep" ]
     then
-        panic "prefix must be set"
+        panic "prefix not specified"
     fi
     # Check that is absolute
     isabs=$(echo "$GLOBAL_PREFIX" | awk '$0 ~ /^\// { print $0 }')
@@ -223,9 +226,9 @@ sanitycheck()
         return
     fi
     # Else, check the architecture
-    if [ -z "$GLOBAL_ARCH" ] || [ -z "$GLOBAL_ARCHS" ]
+    if [ -z "$GLOBAL_ARCH" ]
     then
-        panic "architecture must be set"
+        panic "architecture not specified"
     fi
     archfound=0
     for arch in $GLOBAL_ARCHS
@@ -260,7 +263,7 @@ build()
     checkerror $? "build failed"
     # Run Ninja in build directory
     cd build-${GLOBAL_ARCH}
-    ninja install -j$GLOBAL_JOBCOUNT
+    make install -j$GLOBAL_JOBCOUNT
     checkerror $? "build failed"
 }
 
@@ -268,12 +271,14 @@ build()
 cmakerun()
 {
     # Create the build directory
-    mkdir build-${GLOBAL_ARCH} > /dev/null 2>&1
-    checkerror $? "CMake already configured"
+    if [ ! -d build-${GLOBAL_ARCH} ]
+    then
+        mkdir build-${GLOBAL_ARCH}
+    fi
     cd build-${GLOBAL_ARCH}
     # Run CMake. We use eval to resolve variables in GLOBAL_CMAKEVARS
-    eval cmake .. -G"Ninja" -DCMAKE_INSTALL_PREFIX=$GLOBAL_PREFIX $GLOBAL_CMAKEVARS \
-                -DCMAKE_TOOLCHAIN_FILE="$PWD/../scripts/toolchain.cmake"
+    eval cmake .. -DCMAKE_INSTALL_PREFIX=$GLOBAL_PREFIX $GLOBAL_CMAKEVARS \
+                -DCMAKE_TOOLCHAIN_FILE="$PWD/../scripts/toolchain.cmake" --no-warn-unused-cli
     checkerror $? "configuring CMake failed"
 }
 
@@ -318,8 +323,8 @@ main()
             mkdir build-utils
         fi
         cd build-utils
-        cmake ../utils -DCMAKE_INSTALL_PREFIX=$PWD/../utilsbin -G"Ninja"
-        ninja install -j$GLOBAL_JOBCOUNT
+        cmake ../utils -DCMAKE_INSTALL_PREFIX=$PWD/../utilsbin
+        make install -j$GLOBAL_JOBCOUNT
     elif [ "$GLOBAL_ACTION" = "configure" ]
     then
         if [ ! -d $PWD/config ]
@@ -346,19 +351,43 @@ main()
         then
             mkdir -p $GLOBAL_IMAGE
         fi
-        # Create the disk image
-        ./scripts/image.sh -s 2048 -i $GLOBAL_IMAGE/nndisk.img -d $GLOBAL_PREFIX \
-                           -p1,300,esp,/boot -p301,2047,ext2,/fsroot -u $GLOBAL_USER
-        if [ "$GLOBAL_BOARD" = "sr" ]
+        if [ "$GLOBAL_ARCH" = "i386-pc" ]
         then
-            # Make ESP usable by ARM firmware that isn't aware of GPT
-            ./utilsbin/mbrwrap $GLOBAL_IMAGE/nndisk.img 1 300
-        elif [ "$GLOBAL_BOARD" = "pc" ]
+            foundconfig=0
+            for config in $i386pc_configs
+            do
+                if [ "$config" = "$GLOBAL_CONFIG" ]
+                then
+                    foundconfig=1
+                fi
+            done
+        elif [ "$GLOBAL_ARCH" = "x86_64-pc" ]
         then
-            # Write out MBR and VBR to disk
-            ./utilsbin/mbrwrite $GLOBAL_PREFIX/boot/nbmbr $GLOBAL_IMAGE/nndisk.img
-            # Wrap up ESP so MBR can load it
-            ./utilsbin/mbrwrap $GLOBAL_IMAGE/nndisk.img 1 300
+            foundconfig=0
+            for config in $x86_64pc_configs
+            do
+                if [ "$config" = "$GLOBAL_CONFIG" ]
+                then
+                    foundconfig=1
+                fi
+            done
+        elif [ "$GLOBAL_ARCH" = "aarch64-sr" ]
+        then
+            foundconfig=0
+            for config in $aarch64sr_configs
+            do
+                if [ "$config" = "$GLOBAL_CONFIG" ]
+                then
+                    foundconfig=1
+                fi
+            done
+        if [ "$foundconfig" = "0" ]
+        then
+            panic "invalid configuration specified"
+        fi
+        # Generate it
+        ./scripts/osconfgen.sh -cconfigs/conf-${GLOBAL_CONFIG}.txt -p$GLOBAL_PREFIX -i$GLOBAL_IMAGE \
+                            -ooutput-${GLOBAL_CONFIG} -u$GLOBAL_USER
         fi
     elif [ "$GLOBAL_ACTION" = "build" ]
     then
@@ -370,6 +399,7 @@ main()
         rm -rf ${GLOBAL_PREFIX}-*
         rm -rf fw/edk2/Build
         rm -rf config
+        rm -f usr/include/config-*.h
     fi
 }
 
