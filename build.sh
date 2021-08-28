@@ -381,6 +381,7 @@ main()
                     foundconfig=1
                 fi
             done
+        fi
         if [ "$foundconfig" = "0" ]
         then
             panic "invalid configuration specified"
@@ -388,7 +389,6 @@ main()
         # Generate it
         ./scripts/osconfgen.sh -cconfigs/conf-${GLOBAL_CONFIG}.txt -p$GLOBAL_PREFIX -i$GLOBAL_IMAGE \
                             -ooutput-${GLOBAL_CONFIG} -u$GLOBAL_USER
-        fi
     elif [ "$GLOBAL_ACTION" = "build" ]
     then
         build

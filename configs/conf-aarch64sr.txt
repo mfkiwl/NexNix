@@ -1,0 +1,5 @@
+# conf-aarch64sr.txt - contains file listings for aarch64sr configuration
+# SPDX-License-Identifier: ISC
+
+file output/BOOTAA64.EFI boot/EFI/BOOT/BOOTAA64.EFI
+image 2048 nndisk.img gpt 1,300,esp,/boot
