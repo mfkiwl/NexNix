@@ -9,8 +9,8 @@ size=
 type=
 dir=
 parts=()
-fstypes="ext2 fat32 fat12 active esp"
-parttypes="mbr gpt floppy"
+fstypes="ext2 fat32 active esp"
+parttypes="mbr gpt iso isohybrid"
 parttype=
 user=
 
@@ -180,21 +180,6 @@ partimg()
         then
             base=1
         fi
-        # Handle floppy disks
-        if [ "$parttype" = "floppy" ]
-        then
-            loopdev=$(losetup -f)
-            losetup $loopdev $image
-            mkfs.vfat -F12 $loopdev
-            mkdir fs
-            mount $loopdev fs
-            cp ${dir}${dirprefix}/* fs/
-            sleep 1
-            umount fs
-            losetup -d $loopdev
-            rm -rf fs
-            return
-        fi
         # Create the partition
         if [ "$fstype" = "esp" ]
         then
@@ -256,6 +241,52 @@ main()
     argparse
     # Verfiy the arguments
     checkarg
+    # Handle an ISO image
+    if [ "$parttype" = "iso" ] || [ "$parttype" = "isohybrid" ]
+    then
+        mbrfile=$(echo "${parts[0]}" | awk -F',' '{ print $2 }')
+        if [ -z "$mbrfile" ]
+        then
+            panic "ISOMBR path not specified"
+        fi
+        inputdir=$(echo "${parts[0]}" | awk -F',' '{ print $1 }')
+        if [ -z "$inputdir" ]
+        then
+            panic "input directory not specified"
+        fi
+        img=${dir}/${inputdir}/tmp.img
+        if [ ! -f $img ]
+        then
+            dd if=/dev/zero of=$img bs=1M count=$size > /dev/null 2>&1
+        fi
+        size=$((size * 512))
+        size=$((size / 1024))
+        # Format this disk
+        dev=$(losetup -f)
+        losetup $dev $img
+        mkfs.vfat -F32 $dev > /dev/null 2>&1
+        mkdir fs
+        mount $dev fs
+        sleep 1
+        cp -r ${dir}/boot/* fs/
+        sleep 1
+        umount fs
+        losetup -d $dev
+        rm -rf fs
+        # Convert it to a CDROM
+        if [ "$parttype" = "iso" ]
+        then
+            xorriso -as mkisofs ${dir}/${inputdir} -R -J -c bootcat -b ${mbrfile} \
+                -no-emul-boot -boot-load-size 4 \
+                -eltorito-alt-boot -e $(basename $img) -no-emul-boot -isohybrid-gpt-basdat -o $image \
+                > /dev/null 2>&1
+        elif [ "$parttype" = "isohybrid" ]
+        then
+            xorriso -as mkisofs ${dir}/${inputdir} -R -J -c bootcat -b $(basename $img) \
+                    -hard-disk-boot -boot-load-size 4 -o $image > /dev/null 2>&1
+        fi
+        exit 0
+    fi
     # Create the disk image
     if [ ! -f $image ] && [ ! -b $image ]
     then

@@ -1,0 +1,7 @@
+# conf-x86_64pc-iso.txt - contains CDROM configuration of x86_64-pc target
+# SPDX-License-Identifier: ISC
+
+file output/BOOTX64.EFI boot/EFI/BOOT/BOOTX64.EFI
+file output/nbisombr isoroot/nbisombr
+file output/nexboot boot/nexboot
+image 2048 nncdrom.iso iso isoroot,nbisombr

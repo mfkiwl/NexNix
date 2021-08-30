@@ -1,0 +1,7 @@
+# conf-i386pc-iso.txt - contains CDROM configuration of i386-pc target
+# SPDX-License-Identifier: ISC
+
+file output/BOOTIA32.EFI boot/EFI/BOOT/BOOTIA32.EFI
+file output/nbisombr isoroot/nbisombr
+file output/nexboot boot/nexboot
+image 2048 nncdrom.iso iso isoroot,nbisombr

@@ -78,20 +78,47 @@ then
                         -drive if=pflash,format=raw,unit=1,file=fw/EFI_${arch}_VARS.fd"
 fi
 
+# Decide what disk image to use
+if [ "$arch" = "i386-pc" ]
+then
+    if [ "$USEISO" = "1" ]
+    then
+        if [ "$USELEGACY" = "1" ]
+        then
+            disk="-cdrom images-i386-pc/nnisolegacy.iso"
+        else
+            disk="-cdrom images-i386-pc/nncdrom.iso"
+        fi
+    elif [ "$USELEGACY" = "1" ]
+    then
+        disk="-drive file=images-i386-pc/nnlegacy.img,format=raw"
+    else
+        disk="-drive file=images-i386-pc/nndisk.img,format=raw"
+    fi
+elif [ "$arch" = "x86_64-pc" ]
+then
+    if [ "$USEISO" = "1" ]
+    then
+        disk="-cdrom images-x86_64-pc/nncdrom.iso"
+    else
+        disk="-drive file=images-x86_64/nndisk.img,format=raw"
+    fi
+elif [ "$arch" = "aarch64-sr" ]
+then
+    disk="-drive file=images-aarch64-sr/nndisk.img,format=raw,id=hd0"
+fi
+
 if [ "$board" = "pc" ]
 then
     if [ "$USELEGACY" = "1" ]
     then
-        qemu-system-$mach -M isapc -cpu 486 -m 16M -drive file=images-$arch/nnlegacy.img,format=raw
+        qemu-system-$mach -M isapc -cpu 486 -m 16M $disk
     else
-        qemu-system-$mach -M q35 -m 512M -device qemu-xhci \
-                        -device usb-kbd -smp 8 -drive file=images-$arch/nndisk.img,format=raw \
-                        $QEMUFLAGS
+        qemu-system-$mach -M q35 -m 512M -device qemu-xhci -device usb-kbd -smp 8 $disk $QEMUFLAGS
     fi
 elif [ "$board" = "sr" ]
 then
     qemu-system-$mach -M virt -cpu max -device qemu-xhci \
                         -device usb-kbd -device virtio-gpu -m 512M -smp 8 $QEMUFLAGS \
-                        -device virtio-blk,drive=hd0 -drive \
-                        if=none,format=raw,file=images-$arch/nndisk.img,id=hd0
+                        -device virtio-blk,drive=hd0 $disk
 fi

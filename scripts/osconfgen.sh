@@ -230,12 +230,14 @@ main()
             # Create a hard link between the files
             mkdir -p $(dirname $destfile)
             link $srcfile $destfile
+            chown $user $destfile
             srcfile=
             destfile=
         elif [ "$action" = "image" ]
         then
             # Run image.sh
             ./scripts/image.sh -s$imgsize -i$imgname -d$outputdir -t$imgtype -u$user $parts
+            checkerror $? "unable to create disk image"
             imgsize=
             imgname=
             imgtype=
@@ -244,6 +246,7 @@ main()
         then
             # Run mbrwrite
             ./utilsbin/mbrwrite $mbrpath $imgname $vbrpath $vbrbase
+            checkerror $? "unable to write out MBR"
             mbrpath=
             imgname=
             vbrpath=
@@ -252,6 +255,7 @@ main()
         then
             # Run mbrwrap
             ./utilsbin/mbrwrap $imgname $espbase $espend
+            checkerror $? "unable to wrap up ESP"
             imgname=
             espbase=
             espend=
@@ -259,8 +263,8 @@ main()
         action=
         curline=$((curline+1))
     done
-    chown $user $outputdir
-    chown $user $imagepath
+    chown $user -R $outputdir
+    chown $user -R $imagepath
 }
 
 main "$@"

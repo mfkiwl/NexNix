@@ -6,8 +6,8 @@
 export GLOBAL_ACTIONS="clean dep image configure build"
 export GLOBAL_JOBCOUNT=1
 export GLOBAL_ARCHS="x86_64-pc i386-pc aarch64-sr"
-export i386pc_configs="i386pc-legacy i386pc"
-export x86_64pc_configs="x86_64pc"
+export i386pc_configs="i386pc-legacy i386pc i386pc-iso i386pc-legacyiso"
+export x86_64pc_configs="x86_64pc x86_64pc-iso"
 export aarch64sr_configs="aarch64sr"
 export GLOBAL_CROSS="$PWD/cross"
 
@@ -42,8 +42,6 @@ help()
     cat <<end
 $(basename $0) - builds a distribution of NexNix
 $(basename $0) is a powerful script which is used to build the NexNix operating system
-It uses the file conf/nexnix.conf, which contains all configuration data in realtion to NexNix, using an INI like format
-See docs/conf.md for more info on it
 Below are valid options which can be passed to $(basename $0)
     -h - shows this help screen
     -A ACTION - tells the scripts what it needs to do. These include:
@@ -56,7 +54,7 @@ Below are valid options which can be passed to $(basename $0)
     -i IMAGE - specifies the directory to output disk images to. Required for action "image", else unused
     -p PREFIX - specifies directory to install everything into. Required for actions "build", "image", and "dep"
     -a ARCH - specifies the target architecture to build for. Required for actions "build" and "image"
-    -D "PARAMS" - contains configuration overrides. This allows for users to override the default configuration in nexnix.conf
+    -D "PARAMS" - contains configuration overrides. This allows for users to override the default configuration in nexnix.cfg
     -d - specifies that we are in debug mode
     -P - specifies that profiling is to be enabled. This should be used with -d for optimal resuslts
     -u - specifies users to chown disk images to
@@ -153,6 +151,7 @@ urideparse()
             export $name
             # Set the CMake cache variable
             GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -D${name}=\"${val}\""
+            GLOBAL_CVARS="${GLOBAL_CVARS} -D${name}=\"${val}\""
         done
     fi
 }
@@ -282,6 +281,54 @@ cmakerun()
     checkerror $? "configuring CMake failed"
 }
 
+# Generates a disk image
+imagegen()
+{
+    if [ ! -d $GLOBAL_IMAGE ]
+    then
+        mkdir -p $GLOBAL_IMAGE
+    fi
+    if [ "$GLOBAL_ARCH" = "i386-pc" ]
+    then
+        foundconfig=0
+        for config in $i386pc_configs
+        do
+            if [ "$config" = "$GLOBAL_CONFIG" ]
+            then
+                foundconfig=1
+            fi
+        done
+    elif [ "$GLOBAL_ARCH" = "x86_64-pc" ]
+    then
+        foundconfig=0
+        for config in $x86_64pc_configs
+        do
+            if [ "$config" = "$GLOBAL_CONFIG" ]
+            then
+                foundconfig=1
+            fi
+        done
+    elif [ "$GLOBAL_ARCH" = "aarch64-sr" ]
+    then
+        foundconfig=0
+        for config in $aarch64sr_configs
+        do
+            if [ "$config" = "$GLOBAL_CONFIG" ]
+            then
+                foundconfig=1
+            fi
+        done
+    fi
+    if [ "$foundconfig" = "0" ]
+    then
+        panic "invalid configuration specified"
+    fi
+    # Generate it
+    ./scripts/osconfgen.sh -cconfigs/conf-${GLOBAL_CONFIG}.txt -p$GLOBAL_PREFIX -i$GLOBAL_IMAGE \
+                        -ooutput-${GLOBAL_CONFIG} -u$GLOBAL_USER
+    checkerr $? "image generation failed"
+}
+
 # Main script function. It controls everything else
 main()
 {
@@ -311,7 +358,7 @@ main()
     export GLOBAL_MACH=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $1 }')
     export GLOBAL_BOARD=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $2 }')
     GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DGLOBAL_MACH=\"$GLOBAL_MACH\" \
--DGLOBAL_BOARD=\"$GLOBAL_BOARD\" -DGLOBAL_CROSS=\"$GLOBAL_CROSS\""
+-DGLOBAL_BOARD=\"$GLOBAL_BOARD\" -DGLOBAL_CROSS=\"$GLOBAL_CROSS\" -DGLOBAL_CVARS=\"$GLOBAL_CVARS\""
     # Run based on action now
     if [ "$GLOBAL_ACTION" = "dep" ]
     then
@@ -347,48 +394,7 @@ main()
         cmakerun
     elif [ "$GLOBAL_ACTION" = "image" ]
     then
-        if [ ! -d $GLOBAL_IMAGE ]
-        then
-            mkdir -p $GLOBAL_IMAGE
-        fi
-        if [ "$GLOBAL_ARCH" = "i386-pc" ]
-        then
-            foundconfig=0
-            for config in $i386pc_configs
-            do
-                if [ "$config" = "$GLOBAL_CONFIG" ]
-                then
-                    foundconfig=1
-                fi
-            done
-        elif [ "$GLOBAL_ARCH" = "x86_64-pc" ]
-        then
-            foundconfig=0
-            for config in $x86_64pc_configs
-            do
-                if [ "$config" = "$GLOBAL_CONFIG" ]
-                then
-                    foundconfig=1
-                fi
-            done
-        elif [ "$GLOBAL_ARCH" = "aarch64-sr" ]
-        then
-            foundconfig=0
-            for config in $aarch64sr_configs
-            do
-                if [ "$config" = "$GLOBAL_CONFIG" ]
-                then
-                    foundconfig=1
-                fi
-            done
-        fi
-        if [ "$foundconfig" = "0" ]
-        then
-            panic "invalid configuration specified"
-        fi
-        # Generate it
-        ./scripts/osconfgen.sh -cconfigs/conf-${GLOBAL_CONFIG}.txt -p$GLOBAL_PREFIX -i$GLOBAL_IMAGE \
-                            -ooutput-${GLOBAL_CONFIG} -u$GLOBAL_USER
+        imagegen
     elif [ "$GLOBAL_ACTION" = "build" ]
     then
         build

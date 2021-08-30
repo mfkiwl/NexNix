@@ -5,4 +5,5 @@ cmake_minimum_required(VERSION 3.00 FATAL_ERROR)
 
 add_subdirectory(mbr)
 add_subdirectory(vbr)
+add_subdirectory(isombr)
 add_subdirectory(nexboot)

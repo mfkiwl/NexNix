@@ -29,7 +29,15 @@ checkerr $? "unable to configure NexNix"
 # Figure out what configuration to use
 if [ "$arch" = "i386-pc" ]
 then
-    if [ "$USELEGACY" = "1" ]
+    if [ "$USEISO" = "1" ]
+    then
+        if [ "$USELEGACY" = "1" ]
+        then
+            conf=i386pc-legacyiso
+        else
+            conf=i386pc-iso
+        fi
+    elif [ "$USELEGACY" = "1" ]
     then
         conf=i386pc-legacy
     else
@@ -37,7 +45,12 @@ then
     fi
 elif [ "$arch" = "x86_64-pc" ]
 then
-    conf=x86_64pc
+    if [ "$USEISO" = "1" ]
+    then
+        conf=x86_64pc-iso
+    else
+        conf=x86_64pc
+    fi
 elif [ "$arch" = "aarch64-sr" ]
 then
     conf=aarch64sr
