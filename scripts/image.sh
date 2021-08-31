@@ -9,8 +9,8 @@ size=
 type=
 dir=
 parts=()
-fstypes="ext2 fat32 active esp"
-parttypes="mbr gpt iso isohybrid"
+fstypes="ext2 fat32 esp"
+parttypes="gpt isogpt"
 parttype=
 user=
 
@@ -183,25 +183,10 @@ partimg()
         # Create the partition
         if [ "$fstype" = "esp" ]
         then
-            if [ "$parttype" = "mbr" ]
-            then
-                panic "ESP cannot be created on MBR volume"
-            fi
             parted -s $image "unit MiB mkpart empty fat32 $base $psize set $((index+1)) esp on"
             checkerr $? "unable to create partition"
-        elif [ "$fstype" = "active" ]
-        then
-            if [ "$parttype" = "gpt" ]
-            then
-                panic "active partition cannot be created on GPT volume"
-            fi
-            parted -s $image "unit MiB mkpart primary fat32 $base $psize set $((index+1)) boot on"
-            checkerr $? "unable to create partition"
         else
-            if [ "$parttype" = "mbr" ]
-            then
-                parted -s $image "unit MiB mkpart primary $base $psize"
-            elif [ "$parttype" = "gpt" ]
+            if [ "$parttype" = "gpt" ]
             then
                 parted -s $image "unit MiB mkpart empty $base $psize"
             fi
@@ -213,7 +198,7 @@ partimg()
         checkerr $? "adding partition failed"
         dev=$(echo "$dev" | awk -vline=$((index+1)) '$FNR == $line { print $3 }')
         # Format it
-        if [ "$fstype" = "fat32" ] || [ "$fstype" = "esp" ] || [ "$fstype" = "active" ]
+        if [ "$fstype" = "fat32" ] || [ "$fstype" = "esp" ]
         then
             mkfs.fat -F32 /dev/mapper/$dev > /dev/null 2>&1
         elif [ "$fstype" = "ext2" ]
@@ -234,6 +219,53 @@ partimg()
     done
 }
 
+isogen()
+{
+    mbrfile=$(echo "${parts[0]}" | awk -F',' '{ print $2 }')
+    if [ -z "$mbrfile" ]
+    then
+        panic "ISOMBR path not specified"
+    fi
+    inputdir=$(echo "${parts[0]}" | awk -F',' '{ print $1 }')
+    if [ -z "$inputdir" ]
+    then
+        panic "input directory not specified"
+    fi
+    img=${dir}/${inputdir}/tmp.img
+    size=$((size * 512))
+    size=$((size / 1024))
+    size=$((size / 4))
+    if [ ! -f $img ]
+    then
+        dd if=/dev/zero of=$img bs=1M count=$size > /dev/null 2>&1
+    fi
+    # Format this disk
+    dev=$(losetup -f)
+    losetup $dev $img
+    mkfs.vfat -F32 $dev > /dev/null 2>&1
+    mkdir fs
+    mount $dev fs
+    sleep 1
+    cp -r ${dir}/boot/* fs/
+    sleep 1
+    umount fs
+    losetup -d $dev
+    rm -rf fs
+    # Convert it to a CDROM
+    if [ "$parttype" = "isogpt" ]
+    then
+        xorriso -as mkisofs ${dir}/${inputdir} -R -J -c bootcat -b ${mbrfile} \
+            -no-emul-boot -boot-load-size 61 \
+            -eltorito-alt-boot -e $(basename $img) -no-emul-boot -isohybrid-gpt-basdat -o $image \
+            > /dev/null 2>&1
+    fi
+    # Change ownership to caller
+    chown $user $image
+    chown $user $(dirname $image)
+    chown $user $img
+    exit 0
+}
+
 main()
 {
     export LC_ALL=C
@@ -242,50 +274,9 @@ main()
     # Verfiy the arguments
     checkarg
     # Handle an ISO image
-    if [ "$parttype" = "iso" ] || [ "$parttype" = "isohybrid" ]
+    if [ "$parttype" = "isogpt" ]
     then
-        mbrfile=$(echo "${parts[0]}" | awk -F',' '{ print $2 }')
-        if [ -z "$mbrfile" ]
-        then
-            panic "ISOMBR path not specified"
-        fi
-        inputdir=$(echo "${parts[0]}" | awk -F',' '{ print $1 }')
-        if [ -z "$inputdir" ]
-        then
-            panic "input directory not specified"
-        fi
-        img=${dir}/${inputdir}/tmp.img
-        if [ ! -f $img ]
-        then
-            dd if=/dev/zero of=$img bs=1M count=$size > /dev/null 2>&1
-        fi
-        size=$((size * 512))
-        size=$((size / 1024))
-        # Format this disk
-        dev=$(losetup -f)
-        losetup $dev $img
-        mkfs.vfat -F32 $dev > /dev/null 2>&1
-        mkdir fs
-        mount $dev fs
-        sleep 1
-        cp -r ${dir}/boot/* fs/
-        sleep 1
-        umount fs
-        losetup -d $dev
-        rm -rf fs
-        # Convert it to a CDROM
-        if [ "$parttype" = "iso" ]
-        then
-            xorriso -as mkisofs ${dir}/${inputdir} -R -J -c bootcat -b ${mbrfile} \
-                -no-emul-boot -boot-load-size 4 \
-                -eltorito-alt-boot -e $(basename $img) -no-emul-boot -isohybrid-gpt-basdat -o $image \
-                > /dev/null 2>&1
-        elif [ "$parttype" = "isohybrid" ]
-        then
-            xorriso -as mkisofs ${dir}/${inputdir} -R -J -c bootcat -b $(basename $img) \
-                    -hard-disk-boot -boot-load-size 4 -o $image > /dev/null 2>&1
-        fi
-        exit 0
+        isogen
     fi
     # Create the disk image
     if [ ! -f $image ] && [ ! -b $image ]

@@ -105,10 +105,9 @@ vbrprint:
 vbrpanic:
     ; Print out the message in SI
     call vbrprint
-    ; Read keystroke, then warm boot
     mov ah, 0
-    int 16h
-    int 19h
+    int 16h                         ; Read keystroke
+    jmp 0xFFFF:0                    ; Cold boot computer
 
 ; Allocate the amount of bytes of memory in EAX. Returns a buffer in ES:DI
 vbralloc:
@@ -428,6 +427,9 @@ vbr2start:
     mov byte [es:0x610], 0xB0
     cmp byte [0x600], 0xB0
     je noa20
+
+    ; Restore drive number
+    mov dl, byte [bsdrvnum]
 
     ; Enter into protected mode
     lgdt [gdtptr]

@@ -74,10 +74,9 @@ mbrprint:
 mbrpanic:
     ; Print out the message in SI
     call mbrprint
-    ; Read keystroke, then warm boot
     mov ah, 0
-    int 16h
-    int 19h
+    int 16h                         ; Read keystroke
+    jmp 0xFFFF:0                    ; Cold boot computer
 
 ; The data address packet
 dap: times 16 db 0

@@ -6,7 +6,7 @@
 export GLOBAL_ACTIONS="clean dep image configure build"
 export GLOBAL_JOBCOUNT=1
 export GLOBAL_ARCHS="x86_64-pc i386-pc aarch64-sr"
-export i386pc_configs="i386pc-legacy i386pc i386pc-iso i386pc-legacyiso"
+export i386pc_configs="i386pc i386pc-iso"
 export x86_64pc_configs="x86_64pc x86_64pc-iso"
 export aarch64sr_configs="aarch64sr"
 export GLOBAL_CROSS="$PWD/cross"
@@ -326,7 +326,7 @@ imagegen()
     # Generate it
     ./scripts/osconfgen.sh -cconfigs/conf-${GLOBAL_CONFIG}.txt -p$GLOBAL_PREFIX -i$GLOBAL_IMAGE \
                         -ooutput-${GLOBAL_CONFIG} -u$GLOBAL_USER
-    checkerr $? "image generation failed"
+    checkerror $? "image generation failed"
 }
 
 # Main script function. It controls everything else

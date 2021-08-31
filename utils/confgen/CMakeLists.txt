@@ -10,5 +10,3 @@ set(CMAKE_C_FLAGS "-O3 -DNDEBUG")
 
 add_executable(confgen confgen.c)
 install(TARGETS confgen DESTINATION .)
-
-

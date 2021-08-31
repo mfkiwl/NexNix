@@ -139,6 +139,8 @@ main()
                 elif [ -z "$destfile" ]
                 then
                     destfile=${outputdir}/${field}
+                else
+                    prefile=${outputdir}/${field}
                 fi
             elif [ "$action" = "image" ]
             then
@@ -229,10 +231,16 @@ main()
         then
             # Create a hard link between the files
             mkdir -p $(dirname $destfile)
-            link $srcfile $destfile
+            if [ ! -z "$prefile" ]
+            then
+                cat $prefile $srcfile > $destfile
+            else
+                link $srcfile $destfile
+            fi
             chown $user $destfile
             srcfile=
             destfile=
+            prefile=
         elif [ "$action" = "image" ]
         then
             # Run image.sh

@@ -31,15 +31,7 @@ if [ "$arch" = "i386-pc" ]
 then
     if [ "$USEISO" = "1" ]
     then
-        if [ "$USELEGACY" = "1" ]
-        then
-            conf=i386pc-legacyiso
-        else
-            conf=i386pc-iso
-        fi
-    elif [ "$USELEGACY" = "1" ]
-    then
-        conf=i386pc-legacy
+        conf=i386pc-iso
     else
         conf=i386pc
     fi

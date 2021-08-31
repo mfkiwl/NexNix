@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     }
     // Now we must open up the image file
     int imgfd = open(img, O_RDWR);
-    if(!imgfd)
+    if(imgfd == -1)
     {
         printf("%s: %s: %s\n", progname, img, strerror(errno));
         return 1;

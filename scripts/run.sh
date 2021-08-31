@@ -20,12 +20,7 @@ then
         echo "$(basename $0): error: $arch incompatible with Bochs"
         exit 1
     fi
-    if [ "$mach" = "i386" ] && [ "$USELEGACY" = "1" ]
-    then
-        bochs -q -f scripts/bochs-i386legacy.txt
-    else
-        bochs -q -f  scripts/bochs-${arch}.txt
-    fi
+    bochs -q -f  scripts/bochs-${arch}.txt
     return
 elif [ "$USEVBOX" = "1" ]
 then
@@ -83,15 +78,7 @@ if [ "$arch" = "i386-pc" ]
 then
     if [ "$USEISO" = "1" ]
     then
-        if [ "$USELEGACY" = "1" ]
-        then
-            disk="-cdrom images-i386-pc/nnisolegacy.iso"
-        else
-            disk="-cdrom images-i386-pc/nncdrom.iso"
-        fi
-    elif [ "$USELEGACY" = "1" ]
-    then
-        disk="-drive file=images-i386-pc/nnlegacy.img,format=raw"
+        disk="-cdrom images-i386-pc/nncdrom.iso"
     else
         disk="-drive file=images-i386-pc/nndisk.img,format=raw"
     fi
@@ -110,12 +97,7 @@ fi
 
 if [ "$board" = "pc" ]
 then
-    if [ "$USELEGACY" = "1" ]
-    then
-        qemu-system-$mach -M isapc -cpu 486 -m 16M $disk
-    else
-        qemu-system-$mach -M q35 -m 512M -device qemu-xhci -device usb-kbd -smp 8 $disk $QEMUFLAGS
-    fi
+    qemu-system-$mach -M q35 -m 512M -device qemu-xhci -device usb-kbd -smp 8 $disk $QEMUFLAGS
 elif [ "$board" = "sr" ]
 then
     qemu-system-$mach -M virt -cpu max -device qemu-xhci \

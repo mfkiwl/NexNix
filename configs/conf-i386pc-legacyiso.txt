@@ -1,6 +1,0 @@
-# conf-i386pc-legacyiso.txt - contains file listings for i386pc-legacy CDROM configuration
-# SPDX-License-Identifier: ISC
-
-file output/nexboot boot/nexboot
-file output/nbisombr isoroot/nbisombr
-image 2048 nnisolegacy.iso isohybrid isoroot,nbisombr

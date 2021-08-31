@@ -3,5 +3,6 @@
 
 file output/BOOTIA32.EFI boot/EFI/BOOT/BOOTIA32.EFI
 file output/nbisombr isoroot/nbisombr
+file output/nexboot isoroot/nexboot isoroot/nbisombr
 file output/nexboot boot/nexboot
-image 2048 nncdrom.iso iso isoroot,nbisombr
+image 2048 nncdrom.iso isogpt isoroot,nexboot

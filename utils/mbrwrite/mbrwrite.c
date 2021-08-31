@@ -29,7 +29,7 @@ int main(int argc, char** argv)
     int vbrstart = atoi(argv[4]);
     if(!vbrstart)
     {
-        printf("%s: sector start must be a number", progname);
+        printf("%s: sector start must be a number\n", progname);
         return 1;
     }
     // Open up the MBR
@@ -57,17 +57,21 @@ int main(int argc, char** argv)
         return 1;
     }
     uint8_t buf[1024];
+
     read(mbrfd, buf, 446);
     close(mbrfd);
-    lseek(imgfd, 90, SEEK_SET);
-    write(imgfd, buf + 90, 356);
+    write(imgfd, buf, 446);
+    
     read(vbrfd, buf, 1024);
     lseek(imgfd, vbrstart * 512, SEEK_SET);
     read(imgfd, buf, 90);
+
     uint32_t* partbase = (uint32_t*)&buf[52];
     *partbase = vbrstart;
+
     lseek(imgfd, vbrstart * 512, SEEK_SET);
     write(imgfd, buf, 1024);
+
     close(vbrfd);
     close(imgfd);
     return 0;
