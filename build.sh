@@ -5,10 +5,8 @@
 # Base variables
 export GLOBAL_ACTIONS="clean dep image configure build"
 export GLOBAL_JOBCOUNT=1
-export GLOBAL_ARCHS="x86_64-pc i386-pc aarch64-sr"
+export GLOBAL_ARCHS="i386-pc"
 export i386pc_configs="i386pc i386pc-iso"
-export x86_64pc_configs="x86_64pc x86_64pc-iso"
-export aarch64sr_configs="aarch64sr"
 export GLOBAL_CROSS="$PWD/cross"
 
 # Helper functions
@@ -298,27 +296,6 @@ imagegen()
                 foundconfig=1
             fi
         done
-    elif [ "$GLOBAL_ARCH" = "x86_64-pc" ]
-    then
-        foundconfig=0
-        for config in $x86_64pc_configs
-        do
-            if [ "$config" = "$GLOBAL_CONFIG" ]
-            then
-                foundconfig=1
-            fi
-        done
-    elif [ "$GLOBAL_ARCH" = "aarch64-sr" ]
-    then
-        foundconfig=0
-        for config in $aarch64sr_configs
-        do
-            if [ "$config" = "$GLOBAL_CONFIG" ]
-            then
-                foundconfig=1
-            fi
-        done
-    fi
     if [ "$foundconfig" = "0" ]
     then
         panic "invalid configuration specified"

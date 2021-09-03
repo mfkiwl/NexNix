@@ -45,7 +45,7 @@ printdep()
     echo "In order to build NexNix, the following is required:"
     echo "A nearly POSIX compliant shell, bash (for building the toolchain), \
 GNU make (for building the toolchain), perl, texinfo, system build utilites (gcc, make, etc) \
-cmake, aarch64 GCC, tar, flex, bison, gettext, wget, kpartx, mkfs.ext2, git, GNU parted, acpica-tools, nasm, and python"
+cmake, tar, flex, bison, gettext, wget, kpartx, mkfs.ext2, git, GNU parted, acpica-tools, nasm, and python"
 }
 
 # Checks one individual dependency
@@ -78,7 +78,6 @@ builddep()
     checkdep flex
     checkdep cmake
     checkdep wget
-    checkdep aarch64-linux-gnu-gcc
     checkdep kpartx
     checkdep mkfs.ext2
     checkdep parted
@@ -290,20 +289,7 @@ buildedk2()
     echo "ok"
     echo -n "Building EDK2..."
     # Build it now
-    if [ "$GLOBAL_MACH" = "x86_64" ]
-    then
-        . $PWD/edksetup.sh > build.log 2> builderr.log
-        checkerr $? "EDK2 build failed"
-        make -C BaseTools > build.log 2> builderr.log
-        checkerr $? "EDK2 build failed"
-        build -a X64 -t GCC5 -p OvmfPkg/OvmfPkgX64.dsc -n $GLOBAL_JOBCOUNT > build.log 2> builderr.log
-        checkerr $? "EDK2 build failed"
-        echo "ok"
-        echo -n "Installing EDK2..."
-        cp Build/OvmfX64/DEBUG_GCC5/FV/OVMF_CODE.fd ../EFI_${GLOBAL_ARCH}.fd
-        cp Build/OvmfX64/DEBUG_GCC5/FV/OVMF_VARS.fd ../EFI_${GLOBAL_ARCH}_VARS.fd
-        echo "ok"
-    elif [ "$GLOBAL_MACH" = "i386" ]
+    if [ "$GLOBAL_MACH" = "i386" ]
     then
         . $PWD/edksetup.sh > build.log 2> builderr.log
         checkerr $? "EDK2 build failed"
@@ -317,20 +303,6 @@ buildedk2()
         truncate -s 64M ../EFI_${GLOBAL_ARCH}.fd
         cp Build/OvmfIa32/DEBUG_GCC5/FV/OVMF_VARS.fd ../EFI_${GLOBAL_ARCH}_VARS.fd
         truncate -s 64M ../EFI_${GLOBAL_ARCH}_VARS.fd
-        echo "ok"
-    elif [ "$GLOBAL_ARCH" = "aarch64-sr" ]
-    then
-        export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
-        . $PWD/edksetup.sh > build.log 2> builderr.log
-        checkerr $? "EDK2 build failed"
-        make -C BaseTools > build.log 2> builderr.log
-        checkerr $? "EDK2 build failed"
-        build -a AARCH64 -t GCC5 -p ArmVirtPkg/ArmVirtQemu.dsc -n $GLOBAL_JOBCOUNT > build.log 2> builderr.log
-        checkerr $? "EDK2 build failed"
-        echo "ok"
-        echo -n "Installing EDK2..."
-        cp Build/ArmVirtQemu-AARCH64/DEBUG_GCC5/FV/QEMU_EFI.fd ../EFI_${GLOBAL_ARCH}.fd
-        cp Build/ArmVirtQemu-AARCH64/DEBUG_GCC5/FV/QEMU_VARS.fd ../EFI_${GLOBAL_ARCH}_VARS.fd
         echo "ok"
     fi
 }

@@ -1,8 +1,0 @@
-# conf-x86_64pc.txt - contains file listings for x86_64pc configuration
-# SPDX-License-Identifier: ISC
-
-file output/nexboot boot/nexboot
-file output/BOOTX64.EFI boot/EFI/BOOT/BOOTX64.EFI
-image 2048 nndisk.img gpt 1,300,esp,/boot
-mbrwrite output/nbmbr nndisk.img output/nbvbr 2048
-mbrwrap nndisk.img 1 300

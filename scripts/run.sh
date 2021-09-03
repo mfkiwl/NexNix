@@ -82,25 +82,9 @@ then
     else
         disk="-drive file=images-i386-pc/nndisk.img,format=raw"
     fi
-elif [ "$arch" = "x86_64-pc" ]
-then
-    if [ "$USEISO" = "1" ]
-    then
-        disk="-cdrom images-x86_64-pc/nncdrom.iso"
-    else
-        disk="-drive file=images-x86_64/nndisk.img,format=raw"
-    fi
-elif [ "$arch" = "aarch64-sr" ]
-then
-    disk="-drive file=images-aarch64-sr/nndisk.img,format=raw,id=hd0"
 fi
 
 if [ "$board" = "pc" ]
 then
     qemu-system-$mach -M q35 -m 512M -device qemu-xhci -device usb-kbd -smp 8 $disk $QEMUFLAGS
-elif [ "$board" = "sr" ]
-then
-    qemu-system-$mach -M virt -cpu max -device qemu-xhci \
-                        -device usb-kbd -device virtio-gpu -m 512M -smp 8 $QEMUFLAGS \
-                        -device virtio-blk,drive=hd0 $disk
 fi

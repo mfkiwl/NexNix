@@ -35,17 +35,6 @@ then
     else
         conf=i386pc
     fi
-elif [ "$arch" = "x86_64-pc" ]
-then
-    if [ "$USEISO" = "1" ]
-    then
-        conf=x86_64pc-iso
-    else
-        conf=x86_64pc
-    fi
-elif [ "$arch" = "aarch64-sr" ]
-then
-    conf=aarch64sr
 fi
 sudo ./build.sh -a$arch -Aimage -iimages-$arch -p$PWD/rootdir-$arch -u$(whoami) -c$conf
 checkerr $? "unable to generate disk image(s) for NexNix"

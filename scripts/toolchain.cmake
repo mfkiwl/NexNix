@@ -1,5 +1,4 @@
 # toolchain.cmake - contains toolchain definitions
-# Copyright 2021 Jedidiah Thompson
 # SPDX-License-Identifier: ISC
 
 # Set up compiler definitions
