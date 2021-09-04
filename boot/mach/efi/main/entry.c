@@ -4,10 +4,12 @@
 */
 
 #include <boot/nexboot.h>
+#include <assert.h>
 
 // Main entry point for nexboot (and NexNix for that matter)
 EFI_STATUS EFIAPI nb_main(EFI_HANDLE img, EFI_SYSTEM_TABLE* systab)
 {
+    assert(img == 0);
     efi_stall(2000);
     // Set up UEFI wrapper and EDK2
     efi_init(img, systab);

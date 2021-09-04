@@ -6,8 +6,10 @@ bits 32
 cpu 386
 
 global nb_entry
+extern nb_biosstart
 
 section .text
+
 nb_entry:
     mov ax, 0x18                    ; Set segment registers
     mov ds, ax
@@ -17,10 +19,9 @@ nb_entry:
     mov ss, ax
     mov esp, stacktop               ; Set the stack
 
-    mov byte [0xB8000], 'N'
-    mov byte [0xB8001], 7
+    call nb_biosstart               ; Go to C entry point
 
-    cli
+    cli                             ; Something went wrong if we get here
     hlt
 
 section .data

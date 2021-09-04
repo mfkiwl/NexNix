@@ -28,7 +28,6 @@ checkerror()
 main()
 {
     # First, parse the arguments
-    # The getopts argument list
     arglist="p:i:c:o:u:"
     while getopts $arglist arg $@ > /dev/null 2>&1; do
         case ${arg} in
@@ -50,6 +49,11 @@ main()
                 if [ ! -d "$imagepath" ]
                 then
                     mkdir -p $imagepath
+                fi
+                isabs=$(echo "$imagepath" | awk '$0 ~ /^\// { print $0 }')
+                if [ -z "$isabs" ]
+                then
+                    panic "image path must be absolute"
                 fi
             ;;
             "u")
@@ -125,7 +129,9 @@ main()
                 action=$field
                 continue
             fi
-            # Now chek what find of argument this is
+            # Now find which action this is
+            # The way this checks what arguments this is feels hacky, but it works
+            # TODO: Find a better way of doing this
             if [ "$action" = "file" ]
             then
                 # Check what parameter this is
@@ -139,8 +145,11 @@ main()
                 elif [ -z "$destfile" ]
                 then
                     destfile=${outputdir}/${field}
-                else
+                elif [ -z "$prefile" ]
+                then
                     prefile=${outputdir}/${field}
+                else
+                    panic "$conffile: too many arguments to image action"
                 fi
             elif [ "$action" = "image" ]
             then
@@ -194,6 +203,8 @@ main()
                         panic "$conffile: VBR base must be a number"
                     fi
                     vbrbase=$field
+                else
+                    panic "$conffile: too many arguments to mbrwrite action"
                 fi
             elif [ "$action" = "mbrwrap" ]
             then
@@ -222,6 +233,8 @@ main()
                         panic "$conffile: ESP end must be a number"
                     fi
                     espend=$field
+                else
+                    panic "$conffile: too many arguments to mbrwrap action"
                 fi
             else
                 panic "$conffile: unrecognized action specified"

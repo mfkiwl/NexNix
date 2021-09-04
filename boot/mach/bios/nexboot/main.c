@@ -3,7 +3,10 @@
     SPDX-License-Identifier: ISC
 */
 
-void nb_main()
+#include <boot/nexboot.h>
+
+void nb_biosstart()
 {
+    
     for(;;) asm("hlt");
 }

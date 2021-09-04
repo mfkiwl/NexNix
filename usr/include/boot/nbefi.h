@@ -10,6 +10,7 @@
 #include <Library/UefiLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Protocol/EdidActive.h>
+#include <Library/DebugLib.h>
 
 // Some library functions
 

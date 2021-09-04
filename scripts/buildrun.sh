@@ -24,7 +24,7 @@ checkerr $? "unable to configure NexNix"
 
 # Build it
 ./build.sh -a$arch -Abuild -p$PWD/rootdir-$arch -j$(nproc)
-#checkerr $? "unable to build NexNix"
+checkerr $? "unable to build NexNix"
 
 # Figure out what configuration to use
 if [ "$arch" = "i386-pc" ]
@@ -36,9 +36,11 @@ then
         conf=i386pc
     fi
 fi
-sudo ./build.sh -a$arch -Aimage -iimages-$arch -p$PWD/rootdir-$arch -u$(whoami) -c$conf
-checkerr $? "unable to generate disk image(s) for NexNix"
+# Create it
+sudo ./build.sh -a$arch -Aimage -iimages-$arch -p$PWD/rootdir-$arch -u$(whoami) -c$conf \
+                -ooutput-${conf}
+checkerr $? "unable to generate image configuration for NexNix"
 
-# Run it in QEMU
+# Run it in an emulator
 ./scripts/run.sh $arch
  

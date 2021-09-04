@@ -118,6 +118,8 @@ isostart:
     cmp bx, 0xAA55                  ; Are they present?
     jne isopanic
 
+    mov byte [biosdrive], dl        ; Save BIOS drive number
+
     ; Enable the A20 gate
     cli
     .wait1:
@@ -218,10 +220,8 @@ isopm:
     mov ecx, ISOMBR_NBWORDS
     rep movsw
 
-    ; Jump to bootloader
-    jmp 0x10:ISOMBR_NBBASE
+    movzx edx, byte [biosdrive]             ; Restore drive number
 
-    cli
-    hlt
+    jmp 0x10:ISOMBR_NBBASE                  ; To the bootloader we go
 
 times ISOMBR_SIZE - ($ - $$) db 0

@@ -10,11 +10,14 @@
 #include <libgen.h>
 #include <ctype.h>
 #include <errno.h>
+#include <libgen.h>
 
 #define LINESZ 256
 #define VARMAX 4
 
 char* progname = NULL;
+
+char* projprefix = NULL;
 
 void parsefile(FILE* src, FILE* dest, FILE* hdr);
 
@@ -52,22 +55,30 @@ int runsubprojects(char* title, FILE* dest, FILE* hdr)
         return 0;
     }
     free(projvar);
+    // Strip val of quotation marks
+    if(*val == '\"')
+    {
+        ++val;
+        val[strlen(val) - 1] = '\0';
+    }
     // Parse the string
     char* proj = strtok(val, " ");
     do
     {
         // Open up this file, first preparing the path of this file
-        char* filepath = malloc((strlen(proj) * 2) + 5);
-        strcpy(filepath, proj);
+        char* filepath = malloc((((strlen(proj)) * 2) + strlen(projprefix)) + 6);
+        strcpy(filepath, projprefix);
         strcat(filepath, "/");
         strcat(filepath, proj);
+        strcat(filepath, "/");
+        strcat(filepath, basename(proj));
         strcat(filepath, ".cfg");
         FILE* file = fopen(filepath, "r");
         if(!file)
         {
             panic("%s: %s\n", filepath, strerror(errno));
             free(filepath);
-            return 1;
+            exit(1);
         }
         // Parse it
         parsefile(file, dest, hdr);
@@ -106,7 +117,6 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
         int len = strlen(line) - 1;
         while(isspace(line[len]))
             --len;
-        line[len + 1] = '\0';
         // Now check if this marks the title
         if(line[0] == ':')
         {
@@ -135,6 +145,7 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
             }
             // Copy it over
             ++line;
+            line[len] = '\0';
             title = malloc(len - 1);
             if(!title)
             {
@@ -149,6 +160,7 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
             line = orgline;
             continue;
         }
+        line[len + 1] = '\0';
         // This is a variable assignment. Get everything up until the first whitespace
         // character or an equals sign
         char* name = line;
@@ -176,26 +188,15 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
             ++line;
         char* val = line;
         // Remove quotation marks from line
-        if(*val == '"')
-        {
-            len = strlen(val) - 1;
-            ++val;
-        }
-        else
-            len = strlen(val);
-        int foundquote = 0;
-        if(val[len - 1] == '"')
-        {
-            foundquote = 1;
-            val[len - 1] = '\0';
-        }
+        len = strlen(val);
         // Now we must evaluate variables inside of this expression
         int foundvar = 0;
         char* varstart = NULL;
         char* evaledline = calloc(1, LINESZ * 2);
         if(!evaledline)
         {
-            free(title);
+            if(title)
+                free(title);
             free(orgline);
             fclose(src);
             fclose(dest);
@@ -252,7 +253,9 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
             goto free;
         }
         // Prepend the title now
-        int titlelen = strlen(title);
+        int titlelen = 0;
+        if(title)
+            titlelen = strlen(title);
         int namelen = strlen(name);
         char* fullname = malloc(namelen + titlelen + 2);
         if(!fullname)
@@ -260,44 +263,48 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
             panic("out of memory");
             goto free;
         }
-        strcpy(fullname, title);
-        fullname[titlelen] = '_';
-        fullname[titlelen + 1] = '\0';
-        strcat(fullname, name);
+        int realnamelen = 0;
+        if(titlelen)
+        {
+            strcpy(fullname, title);
+            fullname[titlelen] = '_';
+            strcat(fullname, name);
+            realnamelen = titlelen + namelen + 1;
+        }
+        else
+        {
+            realnamelen = titlelen + namelen;
+            fullname = name;
+        }
         // Now, we must set this enivronment variable
         setenv(fullname, evaledline, 1);
         // We have it parsed now. All that is left is to write this out
         // Write out the shell exporting part
         fwrite((void*)"export ", 7, 1, dest);
-        fwrite(fullname, titlelen + namelen + 1, 1, dest);
+        fwrite(fullname, realnamelen, 1, dest);
         fwrite("=", 1, 1, dest);
-        if(foundquote)
-            --elpos;
-        fwrite("\"", 1, 1, dest);
         fwrite(evaledline, elpos, 1, dest);
-        fwrite("\"\n", 2, 1, dest);
-        // Now write out the CMake variable part
-        fwrite("export GLOBAL_CMAKEVARS=\"${GLOBAL_CMAKEVARS} ", 45, 1, dest);
-        fwrite("-D", 2, 1, dest);
-        fwrite(fullname, titlelen + namelen + 1, 1, dest);
-        fwrite("=\\\"${", 5, 1, dest);
-        fwrite(fullname, titlelen + namelen + 1, 1, dest);
-        fwrite("}\\\"\" \n", 6, 1, dest);
+        fwrite("\n", 1, 1, dest);
+        // Write boilerplate undefinition to header file
+        fwrite("#ifdef ", 7, 1, hdr);
+        fwrite(fullname, realnamelen, 1, hdr);
+        fwrite("\n#undef ", 8, 1, hdr);
+        fwrite(fullname, realnamelen, 1, hdr);
+        fwrite("\n#endif\n", 8, 1, hdr);
         // Write out the header #define line
         fwrite("#define ", 8, 1, hdr);
-        fwrite(fullname, titlelen + namelen + 1, 1, hdr);
+        fwrite(fullname, realnamelen, 1, hdr);
         fwrite(" ", 1, 1, hdr);
-        if(foundquote)
-            fwrite("\"", 1, 1, hdr);
         fwrite(evaledline, elpos, 1, hdr);
-        if(foundquote)
-            fwrite("\"", 1, 1, hdr);
         fwrite("\n", 1, 1, hdr);
+        if(titlelen)
+            free(fullname);
         free:
         free(evaledline);
         if(exiting)
         {
-            free(title);
+            if(title)
+                free(title);
             free(orgline);
             fclose(src);
             fclose(dest);
@@ -345,9 +352,15 @@ int main(int argc, char** argv)
         panic("%s: %s\n", argv[3], strerror(errno));
         exit(1);
     }
+    // Allocate prefix for project paths
+    projprefix = malloc(256);
+    // Set it to current path
+    char* pwd = getenv("PWD");
+    strcpy(projprefix, pwd);
     // Parse all the files
     parsefile(conf, output, hdr);
     // Cleanup files and memory
+    free(projprefix);
     fclose(conf);
     fclose(output);
     fclose(hdr);

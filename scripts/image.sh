@@ -10,7 +10,7 @@ type=
 dir=
 parts=()
 fstypes="ext2 fat32 esp"
-parttypes="gpt isogpt"
+parttypes="gpt iso"
 parttype=
 user=
 
@@ -118,10 +118,6 @@ partimg()
     if [ "$parttype" = "gpt" ]
     then
         parted -s $image "mklabel gpt"
-        checkerr $? "unable to create partition table"
-    elif [ "$parttype" = "mbr" ]
-    then
-        parted -s $image "mklabel msdos"
         checkerr $? "unable to create partition table"
     fi
     # Loop through every partition
@@ -252,7 +248,7 @@ isogen()
     losetup -d $dev
     rm -rf fs
     # Convert it to a CDROM
-    if [ "$parttype" = "isogpt" ]
+    if [ "$parttype" = "iso" ]
     then
         xorriso -as mkisofs ${dir}/${inputdir} -R -J -c bootcat -b ${mbrfile} \
             -no-emul-boot -boot-load-size 61 \
@@ -274,7 +270,7 @@ main()
     # Verfiy the arguments
     checkarg
     # Handle an ISO image
-    if [ "$parttype" = "isogpt" ]
+    if [ "$parttype" = "iso" ]
     then
         isogen
     fi

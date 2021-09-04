@@ -310,7 +310,7 @@ vbr2start:
     ; Now, here is the hard part. We must go through the cluster chain, 
     ; and load every cluster there. This code performs poorly. It would be better if the current
     ; FAT sector was cached instead of re-reading it every time.
-    ; TODO - optimize to cache current FAT sector
+    ; TODO: optimize to cache current FAT sector
 
 .fatloop:
     ; Allocate memory for current cluster
@@ -429,7 +429,7 @@ vbr2start:
     je noa20
 
     ; Restore drive number
-    mov dl, byte [bsdrvnum]
+    movzx edx, byte [bsdrvnum]
 
     ; Enter into protected mode
     lgdt [gdtptr]

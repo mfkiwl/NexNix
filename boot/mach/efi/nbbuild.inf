@@ -12,6 +12,7 @@
 [Sources]
   main/entry.c
   main/efilib.c
+  main/libkwrap.c
 
 [Packages]
   MdePkg/MdePkg.dec

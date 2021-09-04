@@ -41,22 +41,41 @@ help()
 $(basename $0) - builds a distribution of NexNix
 $(basename $0) is a powerful script which is used to build the NexNix operating system
 Below are valid options which can be passed to $(basename $0)
-    -h - shows this help screen
-    -A ACTION - tells the scripts what it needs to do. These include:
+  -h - shows this help screen
+
+  -A ACTION - tells the scripts what it needs to do. These include:
         "build" - builds the system and install in the prefix
         "clean" - removes all intermediate files / folders
         "image" - builds the system, and then creates a disk image
         "dep" - builds dependencies such as the toolchain
     This option is required
-    -j JOBS - specifies how many concurrent jobs to use. 1 is the default
-    -i IMAGE - specifies the directory to output disk images to. Required for action "image", else unused
-    -p PREFIX - specifies directory to install everything into. Required for actions "build", "image", and "dep"
-    -a ARCH - specifies the target architecture to build for. Required for actions "build" and "image"
-    -D "PARAMS" - contains configuration overrides. This allows for users to override the default configuration in nexnix.cfg
-    -d - specifies that we are in debug mode
-    -P - specifies that profiling is to be enabled. This should be used with -d for optimal resuslts
-    -u - specifies users to chown disk images to
-    -c - specifies the configuration to build
+
+  -j JOBS -   specifies how many concurrent jobs to use. 1 is the default
+
+  -i IMAGE -  specifies the directory to output disk images to. 
+              Required for actions "clean" and "image", else unused
+
+  -p PREFIX - specifies directory to install everything into. 
+              Required for actions "build", "image", "clean", and "dep"
+
+  -a ARCH -   specifies the target architecture to build for.  
+              Required for actions "build", "dep", and "image"
+
+  -D "OPT" -  contains configuration overrides. This allows for you to override 
+              the default configuration in nexnix.cfg
+
+  -d          specifies that we are in debug mode
+
+  -P          specifies that profiling is to be enabled. 
+              This should be used with -d for optimal results
+
+  -u          specifies user to chown images to. Required for action "image"
+
+  -c          specifies the configuration to build. 
+              Required for action "image"
+
+  -o          specifies image configuration output directory. 
+              Required for actions "image" and "clean"
 end
     exit 0
 }
@@ -64,7 +83,7 @@ end
 # Parses data in the GLOBAL_ARGS variable
 argparse()
 {
-    arglist="A:hj:i:p:a:dD:Pu:c:"
+    arglist="A:hj:i:p:a:dD:Pu:c:o:"
     # Start the loop
     while getopts $arglist arg $GLOBAL_ARGS > /dev/null 2>&1; do
         case ${arg} in
@@ -107,8 +126,12 @@ argparse()
             "c")
                 export GLOBAL_CONFIG="$OPTARG"
                 ;;
+            "o")
+                export GLOBAL_OUTPUT="$OPTARG"
+                ;;
             "?")
                 panic "invalid argument specified"
+                ;;
         esac
     done
 
@@ -117,12 +140,15 @@ argparse()
 # Parses the -D option
 urideparse()
 {
+    rm -f scripts/scripts.cfg
+    touch scripts/scripts.cfg
     # Check if -D was even sent
     if [ ! -z "$GLOBAL_DEFINES" ]
     then
         # Replace every , with a space
         GLOBAL_DEFINES="$(echo $GLOBAL_DEFINES | sed 's/,/ /g')"
-        for def in $GLOBAL_DEFINES; do
+        for def in $GLOBAL_DEFINES
+        do
             # Check for a colon
             iseq=$(echo "$def" | awk '/.:/')
             if [ -z "$iseq" ]
@@ -145,11 +171,8 @@ urideparse()
             eval "$name=\$val"
             # Evaluate variable references inside of the variable
             val=$(eval "echo $val")
-            # Export it so subshells can see it
-            export $name
-            # Set the CMake cache variable
-            GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -D${name}=\"${val}\""
-            GLOBAL_CVARS="${GLOBAL_CVARS} -D${name}=\"${val}\""
+            # Add it to overrides.cfg
+            printf "$(cat scripts/scripts.cfg)\n$name=$val\n" > scripts/scripts.cfg
         done
     fi
 }
@@ -182,7 +205,23 @@ sanitycheck()
         # Check everything image specific
         if [ -z "$GLOBAL_IMAGE" ]
         then
-            panic "image not specified"
+            panic "image path not specified"
+        fi
+        # Check that it is absolute
+        isabs=$(echo "$GLOBAL_IMAGE" | awk '$0 ~ /^\// { print $0 }')
+        if [ -z "$isabs" ]
+        then
+            panic "image path must be absolute"
+        fi
+        if [ -z "$GLOBAL_OUTPUT" ]
+        then
+            panic "output directory not specified"
+        fi
+        # Check that it is absolute
+        isabs=$(echo "$GLOBAL_OUTPUT" | awk '$0 ~ /^\// { print $0 }')
+        if [ -z "$isabs" ]
+        then
+            panic "output directory must be absolute"
         fi
         if [ "$GLOBAL_ACTION" = "image" ]
         then
@@ -211,7 +250,7 @@ sanitycheck()
     then
         panic "prefix not specified"
     fi
-    # Check that is absolute
+    # Check that it is absolute
     isabs=$(echo "$GLOBAL_PREFIX" | awk '$0 ~ /^\// { print $0 }')
     if [ -z "$isabs" ] && [ "$GLOBAL_ACTION" != "dep" ]
     then
@@ -258,14 +297,12 @@ build()
     # Build nexboot first
     ./boot/buildnb.sh
     checkerror $? "build failed"
-    # Run Ninja in build directory
-    cd build-${GLOBAL_ARCH}
-    make install -j$GLOBAL_JOBCOUNT
-    checkerror $? "build failed"
+    # Run make
+    make -j$GLOBAL_JOBCOUNT
 }
 
-# Configure Ninja
-cmakerun()
+# Configure make
+makeconfig()
 {
     # Create the build directory
     if [ ! -d build-${GLOBAL_ARCH} ]
@@ -273,10 +310,8 @@ cmakerun()
         mkdir build-${GLOBAL_ARCH}
     fi
     cd build-${GLOBAL_ARCH}
-    # Run CMake. We use eval to resolve variables in GLOBAL_CMAKEVARS
-    eval cmake .. -DCMAKE_INSTALL_PREFIX=$GLOBAL_PREFIX $GLOBAL_CMAKEVARS \
-                -DCMAKE_TOOLCHAIN_FILE="$PWD/../scripts/toolchain.cmake" --no-warn-unused-cli
-    checkerror $? "configuring CMake failed"
+    # Run make config
+    make config
 }
 
 # Generates a disk image
@@ -296,13 +331,14 @@ imagegen()
                 foundconfig=1
             fi
         done
+    fi
     if [ "$foundconfig" = "0" ]
     then
         panic "invalid configuration specified"
     fi
     # Generate it
     ./scripts/osconfgen.sh -cconfigs/conf-${GLOBAL_CONFIG}.txt -p$GLOBAL_PREFIX -i$GLOBAL_IMAGE \
-                        -ooutput-${GLOBAL_CONFIG} -u$GLOBAL_USER
+                        -o${GLOBAL_OUTPUT} -u$GLOBAL_USER
     checkerror $? "image generation failed"
 }
 
@@ -327,6 +363,10 @@ main()
     # Source the configuration script
     if [ "$GLOBAL_ACTION" != "dep" ] && [ "$GLOBAL_ACTION" != "configure" ] && [ "$GLOBAL_ACTION" != "clean" ]
     then
+        if [ ! -f  "$PWD/config/config-${GLOBAL_ARCH}.sh" ]
+        then
+            panic "configure must be run before $GLOBAL_ACTION"
+        fi
         . $PWD/config/config-$GLOBAL_ARCH.sh
     fi
     # Parse args to override configuration file
@@ -334,21 +374,13 @@ main()
     # Split up the architecture into machine and board
     export GLOBAL_MACH=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $1 }')
     export GLOBAL_BOARD=$(echo "$GLOBAL_ARCH" | awk -F'-' '{ print $2 }')
-    GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DGLOBAL_MACH=\"$GLOBAL_MACH\" \
--DGLOBAL_BOARD=\"$GLOBAL_BOARD\" -DGLOBAL_CROSS=\"$GLOBAL_CROSS\" -DGLOBAL_CVARS=\"$GLOBAL_CVARS\""
     # Run based on action now
     if [ "$GLOBAL_ACTION" = "dep" ]
     then
         # Build the toolchain
-        bash dep/builddep.sh
+        bash scripts/builddep.sh
         # Build host utilities
-        if [ ! -d build-utils ]
-        then
-            mkdir build-utils
-        fi
-        cd build-utils
-        cmake ../utils -DCMAKE_INSTALL_PREFIX=$PWD/../utilsbin
-        make install -j$GLOBAL_JOBCOUNT
+        gmake -j8 -C utils --no-print-directory
     elif [ "$GLOBAL_ACTION" = "configure" ]
     then
         if [ ! -d $PWD/config ]
@@ -360,15 +392,8 @@ main()
                             $PWD/usr/include/config-${GLOBAL_ARCH}.h
         checkerror $? "unable to generate configuration"
         . $PWD/config/config-$GLOBAL_ARCH.sh
-        # Set the debug variable
-        if [ "$GLOBAL_DEBUG" = "1" ]
-        then
-            GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DCMAKE_BUILD_TYPE=\"Debug\""
-        else
-            GLOBAL_CMAKEVARS="${GLOBAL_CMAKEVARS} -DCMAKE_BUILD_TYPE=\"Release\""
-        fi
         # Run CMake
-        cmakerun
+        makeconfig
     elif [ "$GLOBAL_ACTION" = "image" ]
     then
         imagegen
@@ -380,7 +405,9 @@ main()
         rm -rf build-*
         rm -rf ${GLOBAL_IMAGE}-*
         rm -rf ${GLOBAL_PREFIX}-*
-        rm -rf fw/edk2/Build
+        rm -rf ${GLOBAL_OUTPUT}-*
+        rm -rf fw/edk2/Build/MdeModule/DEBUG_GCC5/*/boot
+        rm -rf fw/edk2/Build/MdeModule/RELEASE_GCC5/*/boot
         rm -rf config
         rm -f usr/include/config-*.h
     fi

@@ -1,6 +1,8 @@
 #! /usr/bin/env sh
-# run.sh - launches QEMU
+# run.sh - launches an emulator
 # SPDX-License-Identifier: ISC
+
+# TODO: allow for more flexible configuration of VMs
 
 arch=$1
 if [ -z "$arch" ]
@@ -32,12 +34,13 @@ then
     fi
     # Check if a NexNix machine has been added yet
     isnexnix=$(VBoxManage list vms | awk '/NexNix/ { print $0 }')
-    rm -f images-${arch}/nndisk.vdi
     if [ ! -z "$isnexnix" ]
     then
         VBoxManage storagectl "NexNix" --name "NexNix-storage" --remove
         VBoxManage closemedium disk images-${arch}/nndisk.vdi
+
     fi
+    rm -f images-${arch}/nndisk.vdi
     VBoxManage convertfromraw images-${arch}/nndisk.img images-${arch}/nndisk.vdi --format VDI
     if [ -z "$isnexnix" ]
     then
@@ -52,7 +55,7 @@ then
         VBoxManage modifyvm "NexNix" --firmware efi
     fi
     VBoxManage storagectl "NexNix" --name "NexNix-storage" --add sata --controller IntelAhci \
-                    --bootable on --portcount 1
+                    --bootable on --portcount 2
     VBoxManage storageattach "NexNix" --storagectl "NexNix-storage" --port 1 --medium \
                     "images-${arch}/nndisk.vdi" --type hdd
     # Start it

@@ -1,5 +1,5 @@
 #! /bin/bash
-# buildnb.sh - script to build nexboot
+# buildnb.sh - script to build nexboot UEFI
 # SPDX-License-Identifier: ISC
 
 cd fw/edk2
