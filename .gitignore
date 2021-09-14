@@ -15,4 +15,6 @@ serial.txt
 bochs.log
 *.ini
 .VSCodeCounter
-scripts/scripts.cfg
+scripts/scripts-*.cfg
+include/ver.h
+*.tar.gz

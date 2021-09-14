@@ -23,7 +23,7 @@ then
         exit 1
     fi
     bochs -q -f  scripts/bochs-${arch}.txt
-    return
+    exit 0
 elif [ "$USEVBOX" = "1" ]
 then
     # Check that the architecture can run VBox
@@ -72,8 +72,7 @@ fi
 
 if [ "$USEBIOS" != "1" ]
 then
-    QEMUFLAGS="${QEMUFLAGS} -drive if=pflash,format=raw,unit=0,file=fw/EFI_$arch.fd \
-                        -drive if=pflash,format=raw,unit=1,file=fw/EFI_${arch}_VARS.fd"
+    QEMUFLAGS="${QEMUFLAGS} -bios fw/OVMF-${arch}.fd"
 fi
 
 # Decide what disk image to use

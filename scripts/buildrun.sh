@@ -18,27 +18,30 @@ then
     echo "$(basename $0): error: architecture not specified"
 fi
 
-# Configure it
-./build.sh -a$arch -Aconfigure -p$PWD/rootdir-$arch -d -j$(nproc)
-checkerr $? "unable to configure NexNix"
+# Configure it, if needed
+if [ "$CONFIGURE" = "1" ]
+then
+    # Figure out what configuration to use
+    if [ "$arch" = "i386-pc" ]
+    then
+        if [ "$USEISO" = "1" ]
+        then
+            conf=i386pc-iso
+        else
+            conf=i386pc
+        fi
+    fi
+    ./build.sh -a$arch -Aconfigure -p$PWD/rootdir-$arch -d -j$(nproc) -b$PWD/build-$arch \
+                -i$PWD/images-$arch -o$PWD/output-$conf -c$conf
+    checkerr $? "unable to configure NexNix"
+fi
 
 # Build it
-./build.sh -a$arch -Abuild -p$PWD/rootdir-$arch -j$(nproc)
+./build.sh -a$arch -Abuild -j$(nproc)
 checkerr $? "unable to build NexNix"
 
-# Figure out what configuration to use
-if [ "$arch" = "i386-pc" ]
-then
-    if [ "$USEISO" = "1" ]
-    then
-        conf=i386pc-iso
-    else
-        conf=i386pc
-    fi
-fi
 # Create it
-sudo ./build.sh -a$arch -Aimage -iimages-$arch -p$PWD/rootdir-$arch -u$(whoami) -c$conf \
-                -ooutput-${conf}
+sudo ./build.sh -a$arch -Aimage -u$(whoami)
 checkerr $? "unable to generate image configuration for NexNix"
 
 # Run it in an emulator

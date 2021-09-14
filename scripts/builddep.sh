@@ -39,15 +39,6 @@ checkerr()
     fi
 }
 
-# Prints a dependency list
-printdep()
-{
-    echo "In order to build NexNix, the following is required:"
-    echo "A nearly POSIX compliant shell, bash (for building the toolchain), \
-GNU make (for building the toolchain), perl, texinfo, system build utilites (gcc, make, etc) \
-cmake, tar, flex, bison, gettext, wget, kpartx, mkfs.ext2, git, GNU parted, acpica-tools, nasm, and python"
-}
-
 # Checks one individual dependency
 checkdep()
 {
@@ -76,7 +67,6 @@ builddep()
     checkdep gettext
     checkdep bison
     checkdep flex
-    checkdep cmake
     checkdep wget
     checkdep kpartx
     checkdep mkfs.ext2
@@ -85,15 +75,17 @@ builddep()
     checkdep iasl
     checkdep python
     checkdep nasm
+    checkdep patch
+    checkdep g++
+    checkdep unzip
 
     if [ $testpassed -eq 0 ]
     then
-        printdep
+        # Exit out
         exit 1
     fi
     echo "ok"
 }
-
 builddeplib()
 {
     # Build libgmp
@@ -174,7 +166,7 @@ buildbinutils()
 {
     cd $GLOBAL_CROSS/src
     # Check if binutils needs to be built
-    if [ -f "$GLOBAL_CROSS/bin/$GLOBAL_MACH-elf-ld" ] && [ "$REBUILD" != "1" ]
+    if [ -f "$GLOBAL_CROSS/bin/$GLOBAL_MACH-elf-ld" ] && [ "$REBUILD_BINUTILS" != "1" ]
     then
         return
     fi
@@ -206,6 +198,24 @@ buildbinutils()
     gmake install -j$GLOBAL_JOBCOUNT > build.log 2> builderr.log
     checkerr $? "binutils install failed"
     echo "ok"
+    if [ "$GLOBAL_MACH" = "i386" ]
+    then
+        cd ..
+        echo -n "Building MinGW binutils..."
+        mkdir binutils-mingw-build
+        cd binutils-mingw-build
+        ../binutils-$binutilsver/configure --prefix=$PWD/../.. --target=$GLOBAL_MACH-mingw32 \
+                                --disable-nls --disable-shared --disable-werror --enable-sysroot \
+                                > /dev/null 2> /dev/null
+        checkerr $? "binutils configure failed"
+        gmake -j$GLOBAL_JOBCOUNT > build.log 2> builderr.log
+        checkerr $? "binutils build failed"
+        echo "ok"
+        echo -n "Installing MinGW binutils..."
+        gmake install -j$GLOBAL_JOBCOUNT > build.log 2> builderr.log
+        checkerr $? "binutils install failed"
+        echo "ok"
+    fi
 }
 
 # Builds GCC
@@ -214,7 +224,7 @@ buildgcc()
     cd $GLOBAL_CROSS/src
 
     # Check if binutils needs to be built
-    if [ -f "$GLOBAL_CROSS/bin/$GLOBAL_MACH-elf-gcc" ] && [ "$REBUILD" != "1" ]
+    if [ -f "$GLOBAL_CROSS/bin/$GLOBAL_MACH-elf-gcc" ] && [ "$REBUILD_GCC" != "1" ]
     then
         return
     fi
@@ -260,51 +270,61 @@ buildgcc()
     gmake install-target-libgcc -j$GLOBAL_JOBCOUNT > build.log 2> builderr.log
     checkerr $? "GCC install failed"
     echo "ok"
+    # Build MinGW if needed
+    if [ "$GLOBAL_MACH" = "i386" ]
+    then
+        echo "Building MinGW GCC..."
+        cd .. && mkdir build-mingw && cd build-mingw
+        ../gcc-$gccver/configure --prefix=$PWD/../.. --target=$GLOBAL_MACH-mingw32 --enable-languages=c,c++ \
+                                --disable-nls --without-headers --with-gmp=$PWD/../../deplib \
+                                --with-mpfr=$PWD/../..deplib --with-mpc=$PWD/../../deblib \
+                                --disable-shared > build.log 2> builderr.log
+        checkerr $? "GCC configure failed"
+        gmake all-gcc -j$GLOBAL_JOBCOUNT > build.log 2> builderr.log
+        checkerr $? "GCC build failed"
+        echo "ok"
+        echo -n "Installing GCC..."
+        gmake install-gcc -j$GLOBAL_JOBCOUNT > build.log 2> builderr.log
+        checkerr $? "GCC install failed"
+        echo "ok"
+    fi
 }
 
-buildedk2()
+buildgnuefi()
 {
     cd $GLOBAL_CROSS/..
-    # Check if EDK2 has already been installed
-    if [ -f "$PWD/fw/EFI_${GLOBAL_ARCH}.fd" ] && [ "$REBUILD" != "1" ]
+    # Check if GNU-EFI has already been installed
+    if [ -f "$PWD/fw/include/efi.h" ] && [ "$REBUILD_GNUEFI" != "1" ]
     then
         return
     fi
-    if [ ! -d fw ]
-    then
-        mkdir fw
-    fi
-    cd fw
-    rm -rf edk2
-    echo -n "Downloading EDK2..."
-    git clone https://github.com/tianocore/edk2.git -b"stable/202011" \
-                                                        > build.log 2> builderr.log
-    checkerr $? "EDK2 download failed"
-    cd edk2 && git submodule update --init > build.log 2> builderr.log
-    checkerr $? "EDK2 download failed"
-    # Patch EDK2
-    cd ..
-    patch -p0 -f < ../dep/edk2.patch > /dev/null 2>/dev/null
-    cd edk2
+    rm -rf fw && mkdir -p fw && cd fw
+    echo -n "Downloading GNU-EFI..."
+    # Download GNU-EFI
+    git clone https://git.code.sf.net/p/gnu-efi/code gnu-efi > build.log 2> builderr.log
     echo "ok"
-    echo -n "Building EDK2..."
-    # Build it now
+    cd gnu-efi
     if [ "$GLOBAL_MACH" = "i386" ]
     then
-        . $PWD/edksetup.sh > build.log 2> builderr.log
-        checkerr $? "EDK2 build failed"
-        make -C BaseTools > build.log 2> builderr.log
-        checkerr $? "EDK2 build failed"
-        build -a IA32 -t GCC5 -p OvmfPkg/OvmfPkgIA32.dsc -n $GLOBAL_JOBCOUNT > build.log 2> builderr.log
-        checkerr $? "EDK2 build failed"
-        echo "ok"
-        echo -n "Installing EDK2..."
-        cp Build/OvmfIa32/DEBUG_GCC5/FV/OVMF_CODE.fd ../EFI_${GLOBAL_ARCH}.fd
-        truncate -s 64M ../EFI_${GLOBAL_ARCH}.fd
-        cp Build/OvmfIa32/DEBUG_GCC5/FV/OVMF_VARS.fd ../EFI_${GLOBAL_ARCH}_VARS.fd
-        truncate -s 64M ../EFI_${GLOBAL_ARCH}_VARS.fd
-        echo "ok"
+        # Install GNU-EFI's files
+        echo -n "Installing GNU-EFI..."
+        mkdir -p ../lib
+        cp gnuefi/elf_ia32_efi.lds ../lib/elf_ia32_efi.lds
     fi
+    mkdir ../include
+    cp -r inc/* ../include/
+    echo "ok"
+    cd ..
+    # Finally, download OVMF
+    echo -n "Downloading OVMF..."
+    if [ "$GLOBAL_MACH" = "i386" ]
+    then
+        wget https://efi.akeo.ie/OVMF/OVMF-IA32.zip > build.log 2> builderr.log
+        checkerr $? "unable to download OVMF"
+        unzip OVMF-IA32.zip > build.log 2> builderr.log
+        mv OVMF.fd OVMF-i386-pc.fd
+    fi
+    echo "ok"
 }
 
 # Check that we were launched from build.sh
@@ -336,7 +356,7 @@ buildbinutils
 # Build GCC
 buildgcc
 
-# Build EDK2
-buildedk2
+# Build GNU-EFI
+buildgnuefi
 
 echo "Dependency build finished"

@@ -2,8 +2,13 @@
 # build.sh - the top level build system for NexNix
 # SPDX-License-Identifier: ISC
 
+# Version info
+export majorver=0
+export minorver=0
+export patchlevel=1
+
 # Base variables
-export GLOBAL_ACTIONS="clean dep image configure build"
+export GLOBAL_ACTIONS="clean dep image configure build dist"
 export GLOBAL_JOBCOUNT=1
 export GLOBAL_ARCHS="i386-pc"
 export i386pc_configs="i386pc i386pc-iso"
@@ -48,6 +53,7 @@ Below are valid options which can be passed to $(basename $0)
         "clean" - removes all intermediate files / folders
         "image" - builds the system, and then creates a disk image
         "dep" - builds dependencies such as the toolchain
+        "dist" - creates a distribution into a tarball
     This option is required
 
   -j JOBS -   specifies how many concurrent jobs to use. 1 is the default
@@ -56,10 +62,10 @@ Below are valid options which can be passed to $(basename $0)
               Required for actions "clean" and "image", else unused
 
   -p PREFIX - specifies directory to install everything into. 
-              Required for actions "build", "image", "clean", and "dep"
+              Required for actions "configure", "image", "clean", and "dep"
 
   -a ARCH -   specifies the target architecture to build for.  
-              Required for actions "build", "dep", and "image"
+              Required for actions "configure", "build", "clean", "dep", and "image"
 
   -D "OPT" -  contains configuration overrides. This allows for you to override 
               the default configuration in nexnix.cfg
@@ -76,6 +82,12 @@ Below are valid options which can be passed to $(basename $0)
 
   -o          specifies image configuration output directory. 
               Required for actions "image" and "clean"
+  
+  -b          specifies build output directory for intermediate files.
+              Required for actions "configure" and "clean"
+
+  -t          specifies make(1) target to run
+
 end
     exit 0
 }
@@ -83,7 +95,7 @@ end
 # Parses data in the GLOBAL_ARGS variable
 argparse()
 {
-    arglist="A:hj:i:p:a:dD:Pu:c:o:"
+    arglist="A:hj:i:p:a:dD:Pu:c:o:b:t:"
     # Start the loop
     while getopts $arglist arg $GLOBAL_ARGS > /dev/null 2>&1; do
         case ${arg} in
@@ -102,17 +114,20 @@ argparse()
             "i")
                 # Grab the image
                 export GLOBAL_IMAGE="$OPTARG"
+                GLOBAL_DEFINES="$GLOBAL_DEFINES GLOBAL_IMAGE:\"$GLOBAL_IMAGE\""
                 ;;
             "p")
                 # Grab the prefix directory
                 export GLOBAL_PREFIX="$OPTARG"
+                # Add it to the user overrides. Kind of a hack, but it works
+                GLOBAL_DEFINES="$GLOBAL_DEFINES GLOBAL_PREFIX:\"$GLOBAL_PREFIX\""
                 ;;
             "a")
                 export GLOBAL_ARCH="$OPTARG"
                 ;;
             "D")
                 # Just grab it
-                GLOBAL_DEFINES="$OPTARG"
+                GLOBAL_DEFINES="$GLOBAL_DEFINES $OPTARG"
                 ;;
             "d")
                 export GLOBAL_DEBUG=1
@@ -125,9 +140,18 @@ argparse()
                 ;;
             "c")
                 export GLOBAL_CONFIG="$OPTARG"
+                GLOBAL_DEFINES="$GLOBAL_DEFINES GLOBAL_CONFIG:\"$GLOBAL_CONFIG\""
                 ;;
             "o")
                 export GLOBAL_OUTPUT="$OPTARG"
+                GLOBAL_DEFINES="$GLOBAL_DEFINES GLOBAL_OUTPUT:\"$GLOBAL_OUTPUT\""
+                ;;
+            "b")
+                export GLOBAL_BUILDDIR="$OPTARG"
+                GLOBAL_DEFINES="$GLOBAL_DEFINES GLOBAL_BUILDDIR:\"$GLOBAL_BUILDDIR\""
+                ;;
+            "t")
+                export GLOBAL_TARGET="$OPTARG"
                 ;;
             "?")
                 panic "invalid argument specified"
@@ -140,11 +164,11 @@ argparse()
 # Parses the -D option
 urideparse()
 {
-    rm -f scripts/scripts.cfg
-    touch scripts/scripts.cfg
     # Check if -D was even sent
     if [ ! -z "$GLOBAL_DEFINES" ]
     then
+        # Create scripts file and empty it
+        cat /dev/null > scripts/scripts-${GLOBAL_ARCH}.cfg
         # Replace every , with a space
         GLOBAL_DEFINES="$(echo $GLOBAL_DEFINES | sed 's/,/ /g')"
         for def in $GLOBAL_DEFINES
@@ -163,6 +187,8 @@ urideparse()
             then
                 panic "variable requires name and value"
             fi
+            # Check if this is quoted
+            isquote=$(echo "$val" | awk '/^"/')
             # Shave off quotation marks
             val="$(echo "$val" | sed 's/\"//g')"
             # Shave trailing whitespace off of the name
@@ -171,8 +197,12 @@ urideparse()
             eval "$name=\$val"
             # Evaluate variable references inside of the variable
             val=$(eval "echo $val")
-            # Add it to overrides.cfg
-            printf "$(cat scripts/scripts.cfg)\n$name=$val\n" > scripts/scripts.cfg
+            # Add it to scripts.cfg, first restoring quotes
+            if [ ! -z "$isquote" ]
+            then
+                val="\"$val\""
+            fi
+            printf "$(cat scripts/scripts-$GLOBAL_ARCH.cfg)\n$name=$val\n" > scripts/scripts-${GLOBAL_ARCH}.cfg
         done
     fi
 }
@@ -199,8 +229,13 @@ sanitycheck()
     then
         panic "invalid action set"
     fi
+    # Action dist has no arguments needed
+    if [ "$GLOBAL_ACTION" = "dist" ]
+    then
+        return
+    fi
     # Now diverge based on action
-    if [ "$GLOBAL_ACTION" = "image" ] || [ "$GLOBAL_ACTION" = "clean" ]
+    if [ "$GLOBAL_ACTION" = "configure" ]
     then
         # Check everything image specific
         if [ -z "$GLOBAL_IMAGE" ]
@@ -223,16 +258,36 @@ sanitycheck()
         then
             panic "output directory must be absolute"
         fi
-        if [ "$GLOBAL_ACTION" = "image" ]
+        if [ -z "$GLOBAL_PREFIX" ]
         then
-            if [ -z "$GLOBAL_USER" ]
-            then
-                panic "user not specified"
-            fi
-            if [ -z "$GLOBAL_CONFIG" ]
-            then
-                panic "configuration not specified"
-            fi
+            panic "prefix not specified"
+        fi
+        # Check that it is absolute
+        isabs=$(echo "$GLOBAL_PREFIX" | awk '$0 ~ /^\// { print $0 }')
+        if [ -z "$isabs" ]
+        then
+            panic "prefix must be absolute"
+        fi
+        if [ -z "$GLOBAL_BUILDDIR" ]
+        then
+            panic "build directory not specified"
+        fi
+        # Check that it is absolute
+        isabs=$(echo "$GLOBAL_BUILDDIR" | awk '$0 ~ /^\// { print $0 }')
+        if [ -z "$isabs" ]
+        then
+            panic "build directory must be absolute"
+        fi
+        if [ -z "$GLOBAL_CONFIG" ]
+        then
+            panic "configuration not specified"
+        fi
+    fi
+    if [ "$GLOBAL_ACTION" = "image" ]
+    then
+        if [ -z "$GLOBAL_USER" ]
+        then
+            panic "user not specified"
         fi
     fi
     # Now check common stuff
@@ -245,23 +300,8 @@ sanitycheck()
             panic "job count must be a number"
         fi
     fi
-    # Check the prefix
-    if [ -z "$GLOBAL_PREFIX" ] && [ "$GLOBAL_ACTION" != "dep" ]
-    then
-        panic "prefix not specified"
-    fi
-    # Check that it is absolute
-    isabs=$(echo "$GLOBAL_PREFIX" | awk '$0 ~ /^\// { print $0 }')
-    if [ -z "$isabs" ] && [ "$GLOBAL_ACTION" != "dep" ]
-    then
-        panic "prefix must be absolute"
-    fi
-    # Clean action now returns
-    if [ "$GLOBAL_ACTION" = "clean" ]
-    then
-        return
-    fi
-    # Else, check the architecture
+    
+    # Check the architecture
     if [ -z "$GLOBAL_ARCH" ]
     then
         panic "architecture not specified"
@@ -285,33 +325,9 @@ sanitycheck()
 # Builds the system
 build()
 {
-    # Create the prefix
-    if [ -d $GLOBAL_PREFIX ]
-    then
-        rm -rf $GLOBAL_PREFIX
-    fi
-    mkdir -p $GLOBAL_PREFIX
-    # Install the headers
-    mkdir -p $GLOBAL_PREFIX/usr/include
-    cp -r $PWD/usr/include/* $GLOBAL_PREFIX/usr/include
-    # Build nexboot first
-    ./boot/buildnb.sh
-    checkerror $? "build failed"
     # Run make
-    make -j$GLOBAL_JOBCOUNT
-}
-
-# Configure make
-makeconfig()
-{
-    # Create the build directory
-    if [ ! -d build-${GLOBAL_ARCH} ]
-    then
-        mkdir build-${GLOBAL_ARCH}
-    fi
-    cd build-${GLOBAL_ARCH}
-    # Run make config
-    make config
+    make -j$GLOBAL_JOBCOUNT -Otarget ${GLOBAL_TARGET}
+    checkerror $? "build failed"
 }
 
 # Generates a disk image
@@ -342,6 +358,30 @@ imagegen()
     checkerror $? "image generation failed"
 }
 
+# Configures everything
+configure()
+{
+    # Generate the configuration script
+    ./utilsbin/confgen scripts/nexnix.cfg config/config-$GLOBAL_ARCH.sh \
+                        include/config-${GLOBAL_ARCH}.h
+    checkerror $? "unable to generate configuration"
+    . $PWD/config/config-$GLOBAL_ARCH.sh
+    # Remove "scripts" from projects list
+    GLOBAL_PROJECTS=$(echo "$GLOBAL_PROJECTS" | sed 's/scripts//')
+    export GLOBAL_PROJECTS
+    # Create the prefix
+    if [ ! -d $GLOBAL_PREFIX ]
+    then
+        mkdir -p $GLOBAL_PREFIX
+    fi
+    # Generate ver.h
+    echo "#define NEXNIX_VERMAJ ${majorver}
+#define NEXNIX_VERMIN ${minorver}
+#define NEXNIX_VERPATCH ${patchlevel}" > $PWD/include/ver.h
+    # Configure make now
+    make config
+}
+
 # Main script function. It controls everything else
 main()
 {
@@ -361,13 +401,17 @@ main()
     # Check that it is all valid
     sanitycheck
     # Source the configuration script
-    if [ "$GLOBAL_ACTION" != "dep" ] && [ "$GLOBAL_ACTION" != "configure" ] && [ "$GLOBAL_ACTION" != "clean" ]
+    if [ "$GLOBAL_ACTION" != "dep" ] && [ "$GLOBAL_ACTION" != "configure" ] \
+        && [ "$GLOBAL_ACTION" != "dist" ]
     then
         if [ ! -f  "$PWD/config/config-${GLOBAL_ARCH}.sh" ]
         then
             panic "configure must be run before $GLOBAL_ACTION"
         fi
         . $PWD/config/config-$GLOBAL_ARCH.sh
+        # Remove "scripts" from projects list
+        GLOBAL_PROJECTS=$(echo "$GLOBAL_PROJECTS" | sed 's/scripts//')
+        export GLOBAL_PROJECTS
     fi
     # Parse args to override configuration file
     argparse
@@ -379,21 +423,22 @@ main()
     then
         # Build the toolchain
         bash scripts/builddep.sh
+        checkerror $? "dependency build failed"
+        # Create host utility binary directory
+        mkdir -p utilsbin
         # Build host utilities
         gmake -j8 -C utils --no-print-directory
+    elif [ "$GLOBAL_ACTION" = "dist" ]
+    then
+        # Run make
+        make dist
     elif [ "$GLOBAL_ACTION" = "configure" ]
     then
         if [ ! -d $PWD/config ]
         then
             mkdir $PWD/config
         fi
-        # Generate the configuration script
-        ./utilsbin/confgen scripts/nexnix.cfg config/config-$GLOBAL_ARCH.sh \
-                            $PWD/usr/include/config-${GLOBAL_ARCH}.h
-        checkerror $? "unable to generate configuration"
-        . $PWD/config/config-$GLOBAL_ARCH.sh
-        # Run CMake
-        makeconfig
+        configure
     elif [ "$GLOBAL_ACTION" = "image" ]
     then
         imagegen
@@ -402,14 +447,17 @@ main()
         build
     elif [ "$GLOBAL_ACTION" = "clean" ]
     then
-        rm -rf build-*
-        rm -rf ${GLOBAL_IMAGE}-*
-        rm -rf ${GLOBAL_PREFIX}-*
-        rm -rf ${GLOBAL_OUTPUT}-*
-        rm -rf fw/edk2/Build/MdeModule/DEBUG_GCC5/*/boot
-        rm -rf fw/edk2/Build/MdeModule/RELEASE_GCC5/*/boot
+        # Tell make to clean out build files
+        make clean -j${GLOBAL_JOBCOUNT} -Otarget
+        rm -rf ${GLOBAL_IMAGE}
+        rm -rf ${GLOBAL_PREFIX}
+        rm -rf ${GLOBAL_OUTPUT}
+        rm -rf ${GLOBAL_BUILDDIR}
+        rm -rf fw/edk2/Build/MdeModule/*/*/boot
         rm -rf config
-        rm -f usr/include/config-*.h
+        rm -f include/config-*.h
+        rm -f include/ver.h
+        rm -f scripts/scripts-*.cfg
     fi
 }
 

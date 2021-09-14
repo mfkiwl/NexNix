@@ -7,10 +7,10 @@
 #define _NEXBOOT_H
 
 // Version info
-#include <version.h>
+#include <ver.h>
 
 // Only include UEFI stuff if needed
-#if NEXBOOT_UEFI == 1
+#if NEXBOOT_EFI == 1
 #include <boot/nbefi.h>
 #endif
 
@@ -20,6 +20,5 @@
 // Freestanding headers
 #include <stdint.h>
 #include <stddef.h>
-#include <limits.h>
 
 #endif

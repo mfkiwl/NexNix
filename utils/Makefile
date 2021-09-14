@@ -3,8 +3,8 @@
 
 all: ../utilsbin/confgen ../utilsbin/mbrwrap ../utilsbin/mbrwrite
 
-../utilsbin/%:  %.c
+../utilsbin/%: %.c Makefile
 	@echo "Compiling $@"
-	@$(CC) -std=gnu11 -o $@ $<
+	@$(CC) -O3 -DNDEBUG -std=gnu11 -o $@ $<
 
 .PHONY: all

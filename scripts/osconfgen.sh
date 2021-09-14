@@ -45,7 +45,7 @@ main()
                 fi
             ;;
             "i")
-                imagepath=$PWD/$OPTARG
+                imagepath=$OPTARG
                 if [ ! -d "$imagepath" ]
                 then
                     mkdir -p $imagepath
@@ -67,7 +67,7 @@ main()
                 fi
             ;;
             "o")
-                outputdir=$PWD/$OPTARG
+                outputdir=$OPTARG
                 if [ ! -d "$outputdir" ]
                 then
                     mkdir -p $outputdir

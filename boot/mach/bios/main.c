@@ -7,6 +7,5 @@
 
 void nb_biosstart()
 {
-    
     for(;;) asm("hlt");
 }

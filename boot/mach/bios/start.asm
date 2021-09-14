@@ -1,5 +1,4 @@
-; start.asm - contains startup code for nexboot. 
-; Paging is enabled here, and if wanted, 64 bit long mode is entered into
+; start.asm - contains startup code for nexboot
 ; SPDX-License-Identifier: ISC
 
 bits 32

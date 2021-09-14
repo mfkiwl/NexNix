@@ -9,5 +9,4 @@ megs: 512
 com1: enabled=1, mode=file, dev=serial.txt
 clock: sync=slowdown, rtc_sync=0
 log: bochs.log
-display_library: x, options="gui_debug"
 boot: disk

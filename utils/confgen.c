@@ -31,7 +31,7 @@ void panic(char* str, ...)
     vprintf(str, list);
     va_end(list);
     // Print newline
-    printf("\r\n");
+    printf("\n");
 }
 
 int runsubprojects(char* title, FILE* dest, FILE* hdr)
@@ -66,22 +66,38 @@ int runsubprojects(char* title, FILE* dest, FILE* hdr)
     do
     {
         // Open up this file, first preparing the path of this file
-        char* filepath = malloc((((strlen(proj)) * 2) + strlen(projprefix)) + 6);
+        // Treat "scripts" specially
+        char* projname = NULL;
+        if(!strcmp(proj, "scripts"))
+        {
+            char* arch = getenv("GLOBAL_ARCH");
+            projname = malloc(strlen(proj) + strlen(arch) + 2);
+            strcpy(projname, proj);
+            strcat(projname, "-");
+            strcat(projname, arch);
+        }
+        char* filepath = malloc((((strlen(proj)) * 2) + strlen(projprefix)) + 11);
         strcpy(filepath, projprefix);
         strcat(filepath, "/");
         strcat(filepath, proj);
         strcat(filepath, "/");
-        strcat(filepath, basename(proj));
+        if(projname)
+            strcat(filepath, projname);
+        else
+            strcat(filepath, basename(proj));
         strcat(filepath, ".cfg");
         FILE* file = fopen(filepath, "r");
         if(!file)
         {
-            panic("%s: %s\n", filepath, strerror(errno));
+            panic("%s: %s", filepath, strerror(errno));
             free(filepath);
             exit(1);
         }
         // Parse it
         parsefile(file, dest, hdr);
+        free(filepath);
+        if(projname)
+            free(projname);
     } while((proj = strtok(NULL, " ")) != NULL);
     return 0;
 }
@@ -109,10 +125,16 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
             ++line;
         // Check if this line is whitespace
         if(*line == '\0')
+        {
+            line = orgline;
             continue;
+        }
         // Is this is a comment?
         if(*line == '#')
+        {
+            line = orgline;
             continue;
+        }
         // Remove all whitespace from the end of the string
         int len = strlen(line) - 1;
         while(isspace(line[len]))
@@ -146,7 +168,7 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
             // Copy it over
             ++line;
             line[len] = '\0';
-            title = malloc(len - 1);
+            title = calloc(1, len + 1);
             if(!title)
             {
                 panic("out of memory");
@@ -219,8 +241,9 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
                     // Evaluate the variable
                     foundvar = 0;
                     int sz = (val + i) - varstart;
-                    char* name = malloc(sz);
+                    char* name = malloc(sz + 1);
                     memcpy(name, varstart, sz);
+                    name[sz] = '\0';
                     // Get the variable
                     char* val = getenv(name);
                     if(!val)
@@ -230,9 +253,23 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
                         exiting = 1;
                         goto free;
                     }
-                    // Copy it to evaledline
-                    strcpy(evaledline + elpos, val);
-                    elpos += strlen(val);
+                    // Copy it to evaledline, stripping quotation marks
+                    int quote = 0;
+                    if(*val == '\"')
+                    {
+                        ++val;
+                        quote = 1;
+                    }
+                    if(quote)
+                    {
+                        memcpy(evaledline + elpos, val, strlen(val) - 1);
+                        elpos += (strlen(val) - 1);
+                    }
+                    else
+                    {
+                        strcpy(evaledline + elpos, val);
+                        elpos += strlen(val);
+                    }
                     free(name);
                 }
             }
@@ -256,8 +293,8 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
         int titlelen = 0;
         if(title)
             titlelen = strlen(title);
-        int namelen = strlen(name);
-        char* fullname = malloc(namelen + titlelen + 2);
+        int namelen = strlen(name) + 1;
+        char* fullname = calloc(1, namelen + titlelen + 2);
         if(!fullname)
         {
             panic("out of memory");
@@ -281,25 +318,25 @@ void parsefile(FILE* src, FILE* dest, FILE* hdr)
         // We have it parsed now. All that is left is to write this out
         // Write out the shell exporting part
         fwrite((void*)"export ", 7, 1, dest);
-        fwrite(fullname, realnamelen, 1, dest);
+        fwrite(fullname, realnamelen - 1, 1, dest);
         fwrite("=", 1, 1, dest);
         fwrite(evaledline, elpos, 1, dest);
         fwrite("\n", 1, 1, dest);
         // Write boilerplate undefinition to header file
         fwrite("#ifdef ", 7, 1, hdr);
-        fwrite(fullname, realnamelen, 1, hdr);
+        fwrite(fullname, realnamelen - 1, 1, hdr);
         fwrite("\n#undef ", 8, 1, hdr);
-        fwrite(fullname, realnamelen, 1, hdr);
+        fwrite(fullname, realnamelen - 1, 1, hdr);
         fwrite("\n#endif\n", 8, 1, hdr);
         // Write out the header #define line
         fwrite("#define ", 8, 1, hdr);
-        fwrite(fullname, realnamelen, 1, hdr);
+        fwrite(fullname, realnamelen - 1, 1, hdr);
         fwrite(" ", 1, 1, hdr);
         fwrite(evaledline, elpos, 1, hdr);
         fwrite("\n", 1, 1, hdr);
+        free:
         if(titlelen)
             free(fullname);
-        free:
         free(evaledline);
         if(exiting)
         {
@@ -328,28 +365,28 @@ int main(int argc, char** argv)
     // Grab the file we want to read and the output too
     if(argc < 4)
     {
-        panic("configuration file and output file must be passed");
+        panic("configuration file, output file, and header file must be specified");
         exit(1);
     }
     // Open up input file
     FILE* conf = fopen(argv[1], "r");
     if(!conf)
     {
-        panic("%s: %s\n", argv[1], strerror(errno));
+        panic("%s: %s", argv[1], strerror(errno));
         exit(1);
     }
     // Open up output file
     FILE* output = fopen(argv[2], "w");
     if(!output)
     {
-        panic("%s: %s\n", argv[2], strerror(errno));
+        panic("%s: %s", argv[2], strerror(errno));
         exit(1);
     }
     // Open up header file
     FILE* hdr = fopen(argv[3], "w");
     if(!hdr)
     {
-        panic("%s: %s\n", argv[3], strerror(errno));
+        panic("%s: %s", argv[3], strerror(errno));
         exit(1);
     }
     // Allocate prefix for project paths
