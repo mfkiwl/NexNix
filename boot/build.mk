@@ -36,7 +36,7 @@ BOOT_SRCFILES := $(BOOT_SRCDIR)/mach/bios/main.c
 BOOT_OBJFILES := $(patsubst %.c,$(GLOBAL_BUILDDIR)/%.c.o,$(BOOT_SRCFILES))
 
 # Assembler sources
-BOOT_ASFILES := $(BOOT_SRCDIR)/mach/bios/start.asm
+BOOT_ASFILES := $(BOOT_SRCDIR)/mach/bios/arch/$(GLOBAL_MACH)/start.asm
 BOOT_ASOBJS := $(patsubst %.asm,$(GLOBAL_BUILDDIR)/%.asm.o,$(BOOT_ASFILES))
 
 # Linker script (for BIOS)

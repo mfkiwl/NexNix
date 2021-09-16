@@ -60,7 +60,7 @@ define AS_TEMPLATE =
 $(1)/%.asm.o: $(2)/%.asm Makefile
 	@echo "[AS] Building $$<"
 	@mkdir -p $$(dir $$@)
-	$(AS) $(GLOBAL_ASFLAGS) $$< -o $$@
+	@$(AS) $(GLOBAL_ASFLAGS) $$< -o $$@
 endef
 
 # Template for linking an app
