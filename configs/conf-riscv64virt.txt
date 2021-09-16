@@ -1,0 +1,5 @@
+# conf-riscv64virt.txt - contains file listing for RISC-V 64 virtual machine
+# SPDX-License-Identifier: ISC
+
+file output/nexboot boot/nexboot
+image 2048 nndisk.img gpt 1,300,fat32,/boot

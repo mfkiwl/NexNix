@@ -6,8 +6,6 @@
 #ifndef _CONFIG_H
 #define _CONFIG_H
 
-#if GLOBAL_ARCH == i386-pc
-#include <config-i386-pc.h>
-#endif
+#include CONFFILE
 
 #endif

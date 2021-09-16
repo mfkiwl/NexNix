@@ -4,6 +4,8 @@
 bits 16
 cpu 386
 
+org 0x600
+
 section .text
 global start
 

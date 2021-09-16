@@ -6,7 +6,9 @@ utilsbin
 fs
 config
 output-*
-config-*.h
+i386-pc.h
+x86_64-pc.h
+riscv64-virt.h
 .vscode
 cross
 images-*

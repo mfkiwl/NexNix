@@ -13,23 +13,29 @@ checkerr()
 
 # Grab the architecture
 arch=$1
+board=$(echo "$arch" | awk -F'-' '{ print $2 }')
 if [ -z "$arch" ]
 then
     echo "$(basename $0): error: architecture not specified"
+    exit 1
 fi
 
 # Configure it, if needed
 if [ "$CONFIGURE" = "1" ]
 then
     # Figure out what configuration to use
-    if [ "$arch" = "i386-pc" ]
+    if [ "$board" = "pc" ]
     then
+        confarch=$(echo "$arch" | sed 's/-//')
         if [ "$USEISO" = "1" ]
         then
-            conf=i386pc-iso
+            conf=$confarch-iso
         else
-            conf=i386pc
+            conf=$confarch
         fi
+    elif [ "$arch" = "riscv64-virt" ]
+    then
+        conf=riscv64virt
     fi
     ./build.sh -a$arch -Aconfigure -p$PWD/rootdir-$arch -d -j$(nproc) -b$PWD/build-$arch \
                 -i$PWD/images-$arch -o$PWD/output-$conf -c$conf

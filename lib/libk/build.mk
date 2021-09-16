@@ -34,5 +34,5 @@ lib/libk_config:
 	@mkdir -p $(LIBK_OBJDIR)
 
 $(eval $(call CLEAN_TEMPLATE,lib/libk_clean,libk,$(LIBK_OBJDIR)))
-$(eval $(call CC_TEMPLATE,$(LIBK_OBJDIR),$(LIBK_SRCDIR),$(LIBK_CFLAGS) $(LIBK_CFLAGS_$(GLOBAL_MACH)),))
-$(eval $(call AR_TEMPLATE,$(LIBK_OUTPUTNAME),$(LIBK_OBJFILES),../lib/libk.a))
+$(eval $(call CC_TEMPLATE,$(LIBK_OBJDIR),$(LIBK_SRCDIR),$(LIBK_CFLAGS) $(LIBK_CFLAGS_$(GLOBAL_MACH))))
+$(eval $(call AR_TEMPLATE,$(LIBK_OUTPUTNAME),$(LIBK_OBJFILES),../lib/libk.a,))

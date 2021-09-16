@@ -60,7 +60,7 @@ then
                     "images-${arch}/nndisk.vdi" --type hdd
     # Start it
     VBoxManage startvm --putenv VBOX_GUI_DBG_ENABLED=true "NexNix"
-    return
+    exit 0
 fi
 
 # Check if we need to use KVM
@@ -70,23 +70,30 @@ then
     QEMUFLAGS="${QEMUFLAGS} -enable-kvm"
 fi
 
-if [ "$USEBIOS" != "1" ]
+if [ "$USEBIOS" != "1" ] && [ "$board" = "pc" ]
 then
     QEMUFLAGS="${QEMUFLAGS} -bios fw/OVMF-${arch}.fd"
 fi
 
 # Decide what disk image to use
-if [ "$arch" = "i386-pc" ]
+if [ "$board" = "pc" ]
 then
     if [ "$USEISO" = "1" ]
     then
-        disk="-cdrom images-i386-pc/nncdrom.iso"
+        disk="-cdrom images-$arch/nncdrom.iso"
     else
-        disk="-drive file=images-i386-pc/nndisk.img,format=raw"
+        disk="-drive file=images-$arch/nndisk.img,format=raw"
     fi
+elif [ "$arch" = "riscv64-virt" ]
+then
+    disk="-drive file=images-riscv64-virt/nndisk.img,format=raw"
 fi
 
 if [ "$board" = "pc" ]
 then
     qemu-system-$mach -M q35 -m 512M -device qemu-xhci -device usb-kbd -smp 8 $disk $QEMUFLAGS
+elif [ "$arch" = "riscv64-virt" ]
+then
+    qemu-system-$mach -M virt -bios none -m 512M -device qemu-xhci -device usb-kbd -device virtio-gpu -smp 8 \
+                        $disk -kernel output-riscv64virt/boot/nexboot
 fi

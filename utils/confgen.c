@@ -1,6 +1,8 @@
 /*
     confgen.c - generates a configuration script from configuration file
     SPDX-License-Identifier: ISC
+    FIXME: there were some heap overflow bugs here. I fixed them, but I suspect there is an
+    off by a few error somewhere that is the root cause
 */
 
 #include <stdio.h>

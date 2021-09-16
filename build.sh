@@ -10,8 +10,10 @@ export patchlevel=1
 # Base variables
 export GLOBAL_ACTIONS="clean dep image configure build dist"
 export GLOBAL_JOBCOUNT=1
-export GLOBAL_ARCHS="i386-pc"
+export GLOBAL_ARCHS="i386-pc x86_64-pc riscv64-virt"
 export i386pc_configs="i386pc i386pc-iso"
+export riscv64virt_configs="riscv64virt"
+export x86_64pc_configs="x86_64pc x86_64pc-iso"
 export GLOBAL_CROSS="$PWD/cross"
 
 # Helper functions
@@ -326,7 +328,7 @@ sanitycheck()
 build()
 {
     # Run make
-    make -j$GLOBAL_JOBCOUNT -Otarget ${GLOBAL_TARGET}
+    gmake -j$GLOBAL_JOBCOUNT -Otarget ${GLOBAL_TARGET}
     checkerror $? "build failed"
 }
 
@@ -341,6 +343,26 @@ imagegen()
     then
         foundconfig=0
         for config in $i386pc_configs
+        do
+            if [ "$config" = "$GLOBAL_CONFIG" ]
+            then
+                foundconfig=1
+            fi
+        done
+    elif [ "$GLOBAL_ARCH" = "riscv64-virt" ]
+    then
+        foundconfig=0
+        for config in $riscv64virt_configs
+        do
+            if [ "$config" = "$GLOBAL_CONFIG" ]
+            then
+                foundconfig=1
+            fi
+        done
+    elif [ "$GLOBAL_ARCH" = "x86_64-pc" ]
+    then
+        foundconfig=0
+        for config in $x86_64pc_configs
         do
             if [ "$config" = "$GLOBAL_CONFIG" ]
             then
@@ -363,7 +385,7 @@ configure()
 {
     # Generate the configuration script
     ./utilsbin/confgen scripts/nexnix.cfg config/config-$GLOBAL_ARCH.sh \
-                        include/config-${GLOBAL_ARCH}.h
+                        include/${GLOBAL_ARCH}.h
     checkerror $? "unable to generate configuration"
     . $PWD/config/config-$GLOBAL_ARCH.sh
     # Remove "scripts" from projects list
@@ -379,7 +401,7 @@ configure()
 #define NEXNIX_VERMIN ${minorver}
 #define NEXNIX_VERPATCH ${patchlevel}" > $PWD/include/ver.h
     # Configure make now
-    make config
+    gmake config
 }
 
 # Main script function. It controls everything else
@@ -454,10 +476,10 @@ main()
         rm -rf ${GLOBAL_OUTPUT}
         rm -rf ${GLOBAL_BUILDDIR}
         rm -rf fw/edk2/Build/MdeModule/*/*/boot
-        rm -rf config
-        rm -f include/config-*.h
+        rm -f config/config-${GLOBAL_ARCH}.sh
+        rm -f include/${GLOBAL_ARCH}.h
         rm -f include/ver.h
-        rm -f scripts/scripts-*.cfg
+        rm -f scripts/scripts-${GLOBAL_ARCH}.cfg
     fi
 }
 

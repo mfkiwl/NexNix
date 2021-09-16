@@ -78,6 +78,7 @@ builddep()
     checkdep patch
     checkdep g++
     checkdep unzip
+    checkdep xorriso
 
     if [ $testpassed -eq 0 ]
     then
@@ -173,6 +174,7 @@ buildbinutils()
 
     # Remove any previous binutils source
     rm -rf binutils-build
+    rm -rf binutils-mingw-build
     rm -rf binutils-$binutilsver
     rm -f binutils-$binutilsver.tar.gz
 
@@ -198,7 +200,7 @@ buildbinutils()
     gmake install -j$GLOBAL_JOBCOUNT > build.log 2> builderr.log
     checkerr $? "binutils install failed"
     echo "ok"
-    if [ "$GLOBAL_MACH" = "i386" ]
+    if [ "$GLOBAL_BOARD" = "pc" ]
     then
         cd ..
         echo -n "Building MinGW binutils..."
@@ -229,7 +231,8 @@ buildgcc()
         return
     fi
 
-    # Remove any previous binutils source
+    # Remove any previous GCC source
+    rm -rf build-mingw
     rm -rf build-gcc
     rm -rf gcc-$gccver
     rm -f gcc-$gccver.tar.gz
@@ -271,9 +274,9 @@ buildgcc()
     checkerr $? "GCC install failed"
     echo "ok"
     # Build MinGW if needed
-    if [ "$GLOBAL_MACH" = "i386" ]
+    if [ "$GLOBAL_BOARD" = "pc" ]
     then
-        echo "Building MinGW GCC..."
+        echo -n "Building MinGW GCC..."
         cd .. && mkdir build-mingw && cd build-mingw
         ../gcc-$gccver/configure --prefix=$PWD/../.. --target=$GLOBAL_MACH-mingw32 --enable-languages=c,c++ \
                                 --disable-nls --without-headers --with-gmp=$PWD/../../deplib \
@@ -283,7 +286,7 @@ buildgcc()
         gmake all-gcc -j$GLOBAL_JOBCOUNT > build.log 2> builderr.log
         checkerr $? "GCC build failed"
         echo "ok"
-        echo -n "Installing GCC..."
+        echo -n "Installing MinGW GCC..."
         gmake install-gcc -j$GLOBAL_JOBCOUNT > build.log 2> builderr.log
         checkerr $? "GCC install failed"
         echo "ok"
@@ -293,8 +296,8 @@ buildgcc()
 buildgnuefi()
 {
     cd $GLOBAL_CROSS/..
-    # Check if GNU-EFI has already been installed
-    if [ -f "$PWD/fw/include/efi.h" ] && [ "$REBUILD_GNUEFI" != "1" ]
+    # Check if OVMF has already been installed
+    if [ -f "$PWD/fw/include/OVMF-$GLOBAL_ARCH" ] && [ "$REBUILD_GNUEFI" != "1" ]
     then
         return
     fi
@@ -304,13 +307,8 @@ buildgnuefi()
     git clone https://git.code.sf.net/p/gnu-efi/code gnu-efi > build.log 2> builderr.log
     echo "ok"
     cd gnu-efi
-    if [ "$GLOBAL_MACH" = "i386" ]
-    then
-        # Install GNU-EFI's files
-        echo -n "Installing GNU-EFI..."
-        mkdir -p ../lib
-        cp gnuefi/elf_ia32_efi.lds ../lib/elf_ia32_efi.lds
-    fi
+    # Install GNU-EFI's files
+    echo -n "Installing GNU-EFI..."
     mkdir ../include
     cp -r inc/* ../include/
     echo "ok"
@@ -323,6 +321,12 @@ buildgnuefi()
         checkerr $? "unable to download OVMF"
         unzip OVMF-IA32.zip > build.log 2> builderr.log
         mv OVMF.fd OVMF-i386-pc.fd
+    elif [ "$GLOBAL_MACH" = "x86_64" ]
+    then
+        wget https://efi.akeo.ie/OVMF/OVMF-X64.zip > build.log 2> builderr.log
+        checkerr $? "unable to download OVMF"
+        unzip OVMF-X64.zip > build.log 2> builderr.log
+        mv OVMF.fd OVMF-x86_64-pc.fd
     fi
     echo "ok"
 }

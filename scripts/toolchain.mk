@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: ISC
 
 # Set common architecture
-ifeq ($(GLOBAL_MACH),i386)
+ifeq ($(GLOBAL_BOARD),pc)
 GLOBAL_COMMONARCH := x86
 MINGW_CC := $(GLOBAL_CROSS)/bin/$(GLOBAL_MACH)-mingw32-gcc
 endif
@@ -11,7 +11,7 @@ endif
 CC := $(GLOBAL_CROSS)/bin/$(GLOBAL_MACH)-elf-gcc
 ifeq ($(GLOBAL_COMMONARCH),x86)
 AS := nasm
-GLOBAL_ASFLAGS := $(GLOBAL_NASM_ASFLAGS)
+GLOBAL_ASFLAGS := $(GLOBAL_NASM_ASFLAGS_$(GLOBAL_MACH))
 else
 AS := $(GLOBAL_CROSS)/bin/$(GLOBAL_MACH)-elf-as
 GLOBAL_ASFLAGS :=

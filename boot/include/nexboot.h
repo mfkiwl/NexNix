@@ -14,11 +14,14 @@
 #include <boot/nbefi.h>
 #endif
 
-// Build configuration
-#include <config.h>
-
 // Freestanding headers
 #include <stdint.h>
 #include <stddef.h>
+
+// Basic services
+#include <boot/nbbase.h>
+
+// Build configuration
+#include <config.h>
 
 #endif

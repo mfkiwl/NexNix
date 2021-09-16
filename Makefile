@@ -14,7 +14,7 @@ GLOBAL_INCDIR := $(GLOBAL_PREFIX)/usr/include
 
 # Header files of the whole project
 GLOBAL_HDRFILES := include/config.h \
-					include/config-$(GLOBAL_ARCH).h \
+					include/$(GLOBAL_ARCH).h \
 					include/ver.h
 
 # Dependency files go here
@@ -32,15 +32,15 @@ include scripts/toolchain.mk
 
 # Template for converting a .c to .o
 define CC_TEMPLATE =
-$(1)/%.c.o: $(2)/%.c $(GLOBAL_INCDIR)/hdrstate $(4) Makefile
+$(1)/%.c.o: $(2)/%.c $(4) Makefile
 	@echo "[CC] Building $$<"
 	@mkdir -p $$(dir $$@)
-	@$(CC) -MD $(GLOBAL_CFLAGS) $(3) -c $$< -o $$@
+	@$(CC) -DCONFFILE=\"$(GLOBAL_ARCH).h\" -MD $(GLOBAL_CFLAGS) $(3) -c $$< -o $$@
 endef
 
 # Template for archiving a static library
 define AR_TEMPLATE =
-$(1): $(2) Makefile
+$(1): $(GLOBAL_INCDIR)/hdrstate $(4) $(2) Makefile
 	@echo "[AR] Archiving $(notdir $(1))"
 	@$(AR) rcs $$@ $(2)
 	@echo "[INSTALL] Installing $(notdir $(1))"
@@ -60,12 +60,12 @@ define AS_TEMPLATE =
 $(1)/%.asm.o: $(2)/%.asm Makefile
 	@echo "[AS] Building $$<"
 	@mkdir -p $$(dir $$@)
-	@$(AS) $(GLOBAL_ASFLAGS) $$< -o $$@
+	$(AS) $(GLOBAL_ASFLAGS) $$< -o $$@
 endef
 
 # Template for linking an app
 define LD_TEMPLATE =
-$(1): $(2) $(3) Makefile
+$(1): $(GLOBAL_INCDIR)/hdrstate $(7) $(2) $(3) Makefile
 	@echo "[LD] Linking $(notdir $(1))"
 	@$(CC) $(GLOBAL_LDFLAGS) $(6) $(2) $(5) -o $(1)
 	@echo "[INSTALL] Installing $(notdir $(1))"
