@@ -430,6 +430,11 @@ vbr2start:
     cmp byte [0x600], 0xB0
     je noa20
 
+    ; Clear the screen
+    mov ah, 0
+    mov al, 3
+    int 10h
+
     ; Restore drive number
     movzx edx, byte [bsdrvnum]
 

@@ -7,8 +7,6 @@ cpu 386
 global nb_entry
 extern nb_biosstart
 
-section .text
-
 nb_entry:
     mov ax, 0x18                    ; Set segment registers
     mov ds, ax

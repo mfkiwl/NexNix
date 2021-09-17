@@ -52,29 +52,29 @@ BOOT_ISOMBRNAME := $(BOOT_OBJDIR)/nbisombr
 BOOT_OUTPUTNAMES := $(BOOT_OUTPUTNAME) $(BOOT_MBRNAME) $(BOOT_VBRNAME) $(BOOT_ISOMBRNAME)
 
 # MBR main rule
-$(BOOT_MBRNAME): $(BOOT_SRCDIR)/mach/bios/bootstrap/mbr.asm Makefile
+$(BOOT_MBRNAME): $(BOOT_SRCDIR)/mach/bios/bootstrap/mbr.asm
 	@echo "[AS] Building $<"
 	@$(AS) -fbin $< -o $@
 	@echo "[INSTALL] Installing $(notdir $@)"
 	@install $@ $(GLOBAL_OUTPUTDIR)/$(notdir $@)
 
 # VBR main rule
-$(BOOT_VBRNAME): $(BOOT_SRCDIR)/mach/bios/bootstrap/vbr.asm Makefile
+$(BOOT_VBRNAME): $(BOOT_SRCDIR)/mach/bios/bootstrap/vbr.asm
 	@echo "[AS] Building $<"
 	@$(AS) -fbin $< -o $@
 	@echo "[INSTALL] Installing $(notdir $@)"
 	@install $@ $(GLOBAL_OUTPUTDIR)/$(notdir $@)
 	
 # ISOMBR main rule
-$(BOOT_ISOMBRNAME): $(BOOT_SRCDIR)/mach/bios/bootstrap/isombr.asm Makefile
+$(BOOT_ISOMBRNAME): $(BOOT_SRCDIR)/mach/bios/bootstrap/isombr.asm
 	@echo "[AS] Building $<"
 	@$(AS) -fbin $< -o $@
 	@echo "[INSTALL] Installing $(notdir $@)"
 	@install $@ $(GLOBAL_OUTPUTDIR)/$(notdir $@)
 
 $(eval $(call CLEAN_TEMPLATE,boot_clean,boot,$(BOOT_OBJDIR)))
-$(eval $(call LD_TEMPLATE,$(BOOT_OUTPUTNAME),$(BOOT_OBJFILES) $(BOOT_ASOBJS),\
-		$(LIBK_OUTPUTNAME) $(BOOT_BIOS_LDSCRIPT),nexboot,$(BOOT_LINKLIBS),\
+$(eval $(call LD_TEMPLATE,$(BOOT_OUTPUTNAME),$(BOOT_ASOBJS) $(BOOT_OBJFILES),\
+		$(LIBK_OUTPUTNAME) $(BOOT_BIOS_LDSCRIPT),nexboot,,\
 		$(BOOT_BIOS_LDFLAGS) $(BOOT_BIOS_LDFLAGS_$(GLOBAL_MACH)),$(GLOBAL_INCDIR)/boot/hdrstate))
 $(eval $(call CC_TEMPLATE,$(BOOT_OBJDIR),$(BOOT_SRCDIR),$(BOOT_BIOS_CFLAGS) $(BOOT_BIOS_CFLAGS_$(GLOBAL_MACH))))
 $(eval $(call AS_TEMPLATE,$(BOOT_OBJDIR),$(BOOT_SRCDIR)))
@@ -99,7 +99,7 @@ GLOBAL_DEPFILES += $(patsubst %.o,%.d,$(BOOTEFI_OBJFILES))
 
 # EFI linker target
 $(BOOTEFI_OUTPUTNAME): $(GLOBAL_INCDIR)/hdrstate $(GLOBAL_INCDIR)/boot/hdrstate \
-						$(BOOTEFI_OBJFILES) $(LIBK_OUTPUTNAME) Makefile
+						$(BOOTEFI_OBJFILES) $(LIBK_OUTPUTNAME)
 	@echo "[LD] Linking $(notdir $@)"
 	@$(MINGW_CC) -L $(GLOBAL_PREFIX)/lib $(BOOTEFI_LDFLAGS) $(BOOTEFI_LDFLAGS_$(GLOBAL_MACH)) \
 					 $(BOOTEFI_OBJFILES) -lk -o $(BOOTEFI_OUTPUTNAME)
@@ -107,7 +107,7 @@ $(BOOTEFI_OUTPUTNAME): $(GLOBAL_INCDIR)/hdrstate $(GLOBAL_INCDIR)/boot/hdrstate 
 	@install $(BOOTEFI_OUTPUTNAME) $(GLOBAL_OUTPUTDIR)/nexboot.efi
 
 # Compiler target
-$(BOOTEFI_OBJDIR)/boot/mach/efi/%.c.o: $(BOOTEFI_SRCDIR)/%.c Makefile
+$(BOOTEFI_OBJDIR)/boot/mach/efi/%.c.o: $(BOOTEFI_SRCDIR)/%.c
 	@echo "[CC] Building $<"
 	@mkdir -p $(dir $@)
 	@$(MINGW_CC) -DCONFFILE=\"$(GLOBAL_ARCH).h\" -MD $(GLOBAL_CFLAGS) $(BOOTEFI_CFLAGS) \
@@ -131,9 +131,10 @@ BOOT_OUTPUTNAME = $(BOOT_OBJDIR)/nexboot
 
 $(eval $(call CLEAN_TEMPLATE,boot_clean,boot,$(BOOT_OBJDIR)))
 $(eval $(call LD_TEMPLATE,$(BOOT_OUTPUTNAME),$(BOOT_ASOBJS) $(BOOT_OBJFILES),\
-		$(LIBK_OUTPUTNAME) $(BOOT_VIRT_LDSCRIPT),nexboot,$(BOOT_LINKLIBS),$(BOOT_VIRT_LDFLAGS),\
-		$(GLOBAL_INCDIR)/boot/hdrstate))
-$(eval $(call CC_TEMPLATE,$(BOOT_OBJDIR),$(BOOT_SRCDIR),$(BOOT_VIRT_CFLAGS),$(GLOBAL_INCDIR)/boot/hdrstate))
+		$(LIBK_OUTPUTNAME) $(BOOT_VIRT_LDSCRIPT),nexboot,$(BOOT_LINKLIBS),$(BOOT_VIRT_LDFLAGS) \
+		$(BOOT_VIRT_LDFLAGS_$(GLOBAL_MACH)),$(GLOBAL_INCDIR)/boot/hdrstate))
+$(eval $(call CC_TEMPLATE,$(BOOT_OBJDIR),$(BOOT_SRCDIR),$(BOOT_VIRT_CFLAGS) \
+		$(BOOT_VIRT_CFLAGS_$(GLOBAL_MACH)),$(GLOBAL_INCDIR)/boot/hdrstate))
 $(eval $(call AS_TEMPLATE,$(BOOT_OBJDIR),$(BOOT_SRCDIR)))
 
 boot: $(BOOT_OUTPUTNAME)

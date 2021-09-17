@@ -12,7 +12,7 @@ SECTIONS
 {
     /* We are loaded to 0x3C00 by the VBR */
     . = NB_BASE;
-
+    
     .text :
     {
         *(.text)

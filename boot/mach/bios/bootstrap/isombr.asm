@@ -222,6 +222,11 @@ isopm:
     mov ecx, ISOMBR_NBWORDS
     rep movsw
 
+    ; Clear the screen
+    mov ah, 0
+    mov al, 3
+    int 10h
+
     movzx edx, byte [biosdrive]             ; Restore drive number
 
     jmp 0x10:ISOMBR_NBBASE                  ; To the bootloader we go

@@ -32,7 +32,7 @@ include scripts/toolchain.mk
 
 # Template for converting a .c to .o
 define CC_TEMPLATE =
-$(1)/%.c.o: $(2)/%.c $(4) Makefile
+$(1)/%.c.o: $(2)/%.c $(4)
 	@echo "[CC] Building $$<"
 	@mkdir -p $$(dir $$@)
 	@$(CC) -DCONFFILE=\"$(GLOBAL_ARCH).h\" -MD $(GLOBAL_CFLAGS) $(3) -c $$< -o $$@
@@ -40,7 +40,7 @@ endef
 
 # Template for archiving a static library
 define AR_TEMPLATE =
-$(1): $(GLOBAL_INCDIR)/hdrstate $(4) $(2) Makefile
+$(1): $(GLOBAL_INCDIR)/hdrstate $(4) $(2)
 	@echo "[AR] Archiving $(notdir $(1))"
 	@$(AR) rcs $$@ $(2)
 	@echo "[INSTALL] Installing $(notdir $(1))"
@@ -57,7 +57,7 @@ endef
 
 # Template for assembler sources
 define AS_TEMPLATE =
-$(1)/%.asm.o: $(2)/%.asm Makefile
+$(1)/%.asm.o: $(2)/%.asm
 	@echo "[AS] Building $$<"
 	@mkdir -p $$(dir $$@)
 	@$(AS) $(GLOBAL_ASFLAGS) $$< -o $$@
@@ -65,7 +65,7 @@ endef
 
 # Template for linking an app
 define LD_TEMPLATE =
-$(1): $(GLOBAL_INCDIR)/hdrstate $(7) $(2) $(3) Makefile
+$(1): $(GLOBAL_INCDIR)/hdrstate $(7) $(2) $(3)
 	@echo "[LD] Linking $(notdir $(1))"
 	@$(CC) $(GLOBAL_LDFLAGS) $(6) $(2) $(5) -o $(1)
 	@echo "[INSTALL] Installing $(notdir $(1))"
@@ -100,6 +100,6 @@ $(GLOBAL_INCDIR)/hdrstate: $(GLOBAL_HDRFILES)
 	@cp --preserve=timestamps $? $(GLOBAL_INCDIR)/.
 	@touch $(GLOBAL_INCDIR)/hdrstate
 
--include $(DEPFILES)
+-include $(GLOBAL_DEPFILES)
 
 .PHONY: $(PHONY)

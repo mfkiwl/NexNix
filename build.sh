@@ -391,11 +391,13 @@ configure()
     # Remove "scripts" from projects list
     GLOBAL_PROJECTS=$(echo "$GLOBAL_PROJECTS" | sed 's/scripts//')
     export GLOBAL_PROJECTS
-    # Create the prefix
-    if [ ! -d $GLOBAL_PREFIX ]
+    # If make config has already been run, exit
+    if [ -d $GLOBAL_PREFIX ]
     then
-        mkdir -p $GLOBAL_PREFIX
+        return
     fi
+    # Create the prefix
+    mkdir -p $GLOBAL_PREFIX
     # Generate ver.h
     echo "#define NEXNIX_VERMAJ ${majorver}
 #define NEXNIX_VERMIN ${minorver}

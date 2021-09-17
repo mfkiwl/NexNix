@@ -37,7 +37,7 @@ then
     if [ ! -z "$isnexnix" ]
     then
         VBoxManage storagectl "NexNix" --name "NexNix-storage" --remove
-        VBoxManage closemedium disk images-${arch}/nndisk.vdi
+        VBoxManage closemedium disk images-${arch}/nndisk.vdi > /dev/null 2> /dev/null
 
     fi
     rm -f images-${arch}/nndisk.vdi

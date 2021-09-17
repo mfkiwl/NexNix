@@ -301,7 +301,7 @@ buildgnuefi()
     then
         return
     fi
-    rm -rf fw && mkdir -p fw && cd fw
+    mkdir -p fw && cd fw
     echo -n "Downloading GNU-EFI..."
     # Download GNU-EFI
     git clone https://git.code.sf.net/p/gnu-efi/code gnu-efi > build.log 2> builderr.log
@@ -309,12 +309,15 @@ buildgnuefi()
     cd gnu-efi
     # Install GNU-EFI's files
     echo -n "Installing GNU-EFI..."
-    mkdir ../include
+    mkdir -p ../include
     cp -r inc/* ../include/
     echo "ok"
     cd ..
     # Finally, download OVMF
     echo -n "Downloading OVMF..."
+    rm -f *.zip
+    rm -f OVMF-$GLOBAL_ARCH.fd
+    rm -f readme.txt
     if [ "$GLOBAL_MACH" = "i386" ]
     then
         wget https://efi.akeo.ie/OVMF/OVMF-IA32.zip > build.log 2> builderr.log
